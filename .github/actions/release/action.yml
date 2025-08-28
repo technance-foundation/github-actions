@@ -65,12 +65,12 @@ inputs:
         default: "true"
         required: false
     changesets-title:
-        description: "Release PR title template (uses env.NEW_VERSION)"
-        default: "Release v${{ env.NEW_VERSION }}"
+        description: "Release PR title"
+        default: "Release"
         required: false
     changesets-commit:
-        description: "Release PR commit message (uses env.NEW_VERSION)"
-        default: "Release v${{ env.NEW_VERSION }}"
+        description: "Release PR commit message"
+        default: "Release"
         required: false
 
     # PR back to base branch after publish
@@ -167,7 +167,6 @@ runs:
           working-directory: ${{ inputs.working-directory }}
           run: |
               set -e
-              # jq is present on ubuntu-latest; keep fallback installer just in case.
               if ! command -v jq >/dev/null 2>&1; then
                 sudo apt-get update -y && sudo apt-get install -y jq
               fi
@@ -178,7 +177,6 @@ runs:
                 echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
                 rm -f release.json
               else
-                echo "No new changes to process, skipping version capture"
                 echo "NEW_VERSION=" >> "$GITHUB_ENV"
                 echo "new_version=" >> "$GITHUB_OUTPUT"
               fi
@@ -188,16 +186,15 @@ runs:
           if: ${{ inputs.use-changesets == 'true' }}
           uses: changesets/action@v1
           with:
-              title: ${{ inputs.changesets-title }}
-              commit: ${{ inputs.changesets-commit }}
+              title: "Release v${{ steps.capture-version.outputs.new_version }}"
+              commit: "Release v${{ steps.capture-version.outputs.new_version }}"
               version: ${{ inputs.version-command }}
               publish: ${{ inputs.publish-command }}
           env:
-              GITHUB_TOKEN: ${{ env.GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-              NPM_TOKEN: ${{ env.NPM_PUBLISH_TOKEN || secrets.NPM_PUBLISH_TOKEN }}
-              NODE_AUTH_TOKEN: ${{ env.NPM_PUBLISH_TOKEN || secrets.NPM_PUBLISH_TOKEN }}
+              GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+              NPM_TOKEN: ${{ env.NPM_TOKEN }}
+              NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
 
-        # Optional PR back to base after publish
         - name: Open PR → ${{ inputs.pr-base }}
           id: open-pr
           if: ${{ inputs.open-pr-to-base == 'true' && steps.maybe-changesets.outputs.published == 'true' }}
@@ -214,7 +211,6 @@ runs:
                 --repo "${{ github.repository }}" \
                 --fill --no-maintainer-edit 2>/dev/null || true)"
               echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
-
           env:
-              GH_TOKEN: ${{ env.GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-              GITHUB_TOKEN: ${{ env.GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+              GH_TOKEN: ${{ env.GITHUB_TOKEN }}
+              GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
