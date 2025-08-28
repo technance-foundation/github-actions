@@ -1,0 +1,165 @@
+name: Publish Any Commit (pkg-pr-new + pnpm)
+description: >
+    Reusable composite action to preview-publish packages from any commit using
+    `pnpm dlx pkg-pr-new publish`. Handles checkout, Node/pnpm setup, install, build,
+    and publishing selected workspaces/paths.
+
+branding:
+    icon: upload-cloud
+    color: green
+
+inputs:
+    # Checkout
+    fetch-depth:
+        description: "Checkout fetch depth"
+        default: "0"
+        required: false
+    ref:
+        description: "Ref to checkout"
+        default: "${{ github.ref }}"
+        required: false
+
+    # Node / pnpm
+    node-version-file:
+        description: "Path to .nvmrc; ignored if node-version is provided"
+        default: ".nvmrc"
+        required: false
+    node-version:
+        description: "Explicit Node.js version (overrides node-version-file)"
+        required: false
+    pnpm-version:
+        description: "pnpm version to install"
+        default: "9.0.6"
+        required: false
+    cache:
+        description: "Cache strategy for setup-node (pnpm|npm|yarn|false)"
+        default: "pnpm"
+        required: false
+
+    # Registry / Auth
+    npm-registry:
+        description: "NPM registry URL"
+        default: "https://registry.npmjs.org"
+        required: false
+
+    # Commands
+    install-command:
+        description: "Dependency install command"
+        default: "pnpm install --frozen-lockfile"
+        required: false
+    build-command:
+        description: "Build command; leave empty to skip build"
+        default: "pnpm build"
+        required: false
+
+    # Publish
+    package-paths:
+        description: |
+            One or more package paths to publish. Supports newline or space-separated values.
+            Examples:
+              - "."
+              - "./packages/ui"
+              - "./packages/nova ./packages/react-lib"
+              - |
+                ./packages/nova
+                ./packages/react-lib
+        default: "."
+        required: false
+    pkg-pr-new-version:
+        description: "Version/range of pkg-pr-new to use"
+        default: "latest"
+        required: false
+    pkg-pr-new-extra-args:
+        description: "Additional args to pass to pkg-pr-new publish (e.g. --no-template)"
+        required: false
+
+    # Misc
+    working-directory:
+        description: "Working directory to run commands in"
+        required: false
+
+outputs: {}
+
+runs:
+    using: "composite"
+    steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+          with:
+              fetch-depth: ${{ inputs.fetch-depth }}
+              ref: ${{ inputs.ref }}
+
+        - name: Setup pnpm
+          uses: pnpm/action-setup@v4
+          with:
+              version: ${{ inputs.pnpm-version }}
+              run_install: false
+
+        - name: Setup Node
+          uses: actions/setup-node@v4
+          with:
+              node-version: ${{ inputs.node-version }}
+              node-version-file: ${{ inputs.node-version == '' && inputs.node-version-file || '' }}
+              registry-url: ${{ inputs.npm-registry }}
+              cache: ${{ inputs.cache }}
+              cache-dependency-path: |
+                  **/pnpm-lock.yaml
+
+        - name: Authenticate NPM registry
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: |
+              : "${NPM_TOKEN:?NPM_TOKEN is required}"
+              echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
+
+        - name: Install dependencies
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: ${{ inputs.install-command }}
+
+        - name: Build (optional)
+          if: ${{ inputs.build-command != '' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: ${{ inputs.build-command }}
+
+        - name: Publish with pkg-pr-new
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              _PKG_PR_VERSION: ${{ inputs.pkg-pr-new-version }}
+              _PKG_PR_EXTRA_ARGS: ${{ inputs.pkg-pr-new-extra-args }}
+              _PACKAGE_PATHS_RAW: ${{ inputs.package-paths }}
+          run: |
+              set -euo pipefail
+
+              # Normalize newline/space separated inputs into an array
+              paths=()
+              while IFS= read -r line; do
+                # split by whitespace per line too
+                for p in $line; do
+                  paths+=("$p")
+                done
+              done <<< "$_PACKAGE_PATHS_RAW"
+
+              if [ ${#paths[@]} -eq 0 ]; then
+                echo "No package paths provided"; exit 1
+              fi
+
+              echo "Publishing paths:"
+              printf ' - %s\n' "${paths[@]}"
+
+              # Build argument list
+              args=(publish --pnpm)
+              for p in "${paths[@]}"; do
+                args+=("$p")
+              done
+
+              if [ -n "$_PKG_PR_EXTRA_ARGS" ]; then
+                # shellcheck disable=SC2206
+                extra=( $_PKG_PR_EXTRA_ARGS )
+                args+=("${extra[@]}")
+              fi
+
+              echo "+ pnpm dlx pkg-pr-new@${_PKG_PR_VERSION} ${args[*]}"
+              pnpm dlx "pkg-pr-new@${_PKG_PR_VERSION}" "${args[@]}"
