@@ -38,7 +38,7 @@ jobs:
         timeout-minutes: 15
         steps:
             - name: Release
-              uses: technance-foundation/github-actions/.github/actions/release@v1
+              uses: technance-foundation/github-actions/.github/actions/release@main
 ```
 
 ## Advanced Usage
@@ -48,7 +48,7 @@ Override Node version, working dir, custom commands, and PR behavior:
 ```yaml
 steps:
     - name: Release
-      uses: technance-foundation/github-actions/.github/actions/release@v1
+      uses: technance-foundation/github-actions/.github/actions/release@main
       with:
           node-version: "20"
           pnpm-version: "9.0.6"
