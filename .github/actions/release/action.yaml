@@ -1,0 +1,220 @@
+name: Release (Changesets + pnpm)
+description: >
+    Reusable composite action to build and release packages using pnpm and Changesets.
+    Handles checkout, Node/pnpm setup, install, build, version capture, publish, and optional PR back to main.
+
+branding:
+    icon: package
+    color: blue
+
+inputs:
+    # Git / Branch / Checkout
+    fetch-depth:
+        description: "Checkout fetch depth"
+        default: "0"
+        required: false
+    ref:
+        description: "Ref to checkout"
+        default: "${{ github.ref }}"
+        required: false
+
+    # Node / pnpm
+    node-version-file:
+        description: "Path to .nvmrc; ignored if node-version is provided"
+        default: ".nvmrc"
+        required: false
+    node-version:
+        description: "Explicit Node.js version (overrides node-version-file)"
+        required: false
+    pnpm-version:
+        description: "pnpm version to install"
+        default: "9.0.6"
+        required: false
+    cache:
+        description: "Cache strategy for setup-node (pnpm|npm|yarn|false)"
+        default: "pnpm"
+        required: false
+
+    # Registry / Auth
+    npm-registry:
+        description: "NPM registry URL"
+        default: "https://registry.npmjs.org"
+        required: false
+
+    # Commands
+    install-command:
+        description: "Dependency install command"
+        default: "pnpm install --frozen-lockfile"
+        required: false
+    build-command:
+        description: "Build command"
+        default: "pnpm build"
+        required: false
+    version-command:
+        description: "Changesets version command"
+        default: "pnpm run bump"
+        required: false
+    publish-command:
+        description: "Publish command"
+        default: "pnpm run release"
+        required: false
+
+    # Changesets behavior
+    use-changesets:
+        description: "Use changesets/action@v1 for versioning & publish"
+        default: "true"
+        required: false
+    changesets-title:
+        description: "Release PR title template (uses env.NEW_VERSION)"
+        default: "Release v${{ env.NEW_VERSION }}"
+        required: false
+    changesets-commit:
+        description: "Release PR commit message (uses env.NEW_VERSION)"
+        default: "Release v${{ env.NEW_VERSION }}"
+        required: false
+
+    # PR back to base branch after publish
+    open-pr-to-base:
+        description: "Open a PR from release branch back to base after a successful publish"
+        default: "true"
+        required: false
+    pr-base:
+        description: "Base branch to merge into (e.g. main)"
+        default: "main"
+        required: false
+    pr-title:
+        description: "Title for the back-merge PR"
+        default: "Merge ${{ github.ref_name }} back to main"
+        required: false
+    pr-body:
+        description: "Body for the back-merge PR"
+        default: "Auto-generated after publishing."
+        required: false
+
+    # Misc
+    working-directory:
+        description: "Working directory to run all commands in"
+        required: false
+    continue-on-empty-changesets:
+        description: "Skip version capture gracefully when no changesets exist"
+        default: "true"
+        required: false
+
+outputs:
+    published:
+        description: "Whether a publish occurred (from changesets/action)"
+        value: ${{ steps.maybe-changesets.outputs.published }}
+    new_version:
+        description: "Captured new version from Changesets status (if any)"
+        value: ${{ steps.capture-version.outputs.new_version }}
+    pr_url:
+        description: "URL of the PR opened back to base (if created)"
+        value: ${{ steps.open-pr.outputs.pr_url }}
+
+runs:
+    using: "composite"
+    steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+          with:
+              fetch-depth: ${{ inputs.fetch-depth }}
+              ref: ${{ inputs.ref }}
+
+        - name: Setup git for Changesets
+          shell: bash
+          run: |
+              git config --global user.email "github-actions[bot]@users.noreply.github.com"
+              git config --global user.name "github-actions[bot]"
+              git fetch origin ${{ inputs.pr-base }}:${{ inputs.pr-base }}
+
+        - name: Setup pnpm
+          uses: pnpm/action-setup@v4
+          with:
+              version: ${{ inputs.pnpm-version }}
+              run_install: false
+
+        - name: Setup Node.js
+          uses: actions/setup-node@v4
+          with:
+              node-version: ${{ inputs.node-version }}
+              node-version-file: ${{ inputs.node-version == '' && inputs.node-version-file || '' }}
+              registry-url: ${{ inputs.npm-registry }}
+              cache: ${{ inputs.cache }}
+              cache-dependency-path: |
+                  **/pnpm-lock.yaml
+
+        - name: Authenticate NPM registry
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: |
+              : "${NPM_TOKEN:?NPM_TOKEN is required for install auth}"
+              echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
+
+        - name: Install dependencies
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: ${{ inputs.install-command }}
+
+        - name: Build packages
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: ${{ inputs.build-command }}
+
+        - name: Capture New Release Version
+          id: capture-version
+          if: ${{ inputs.use-changesets == 'true' && ( inputs.continue-on-empty-changesets == 'true' || hashFiles('.changeset/*.md') != '' ) }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: |
+              set -e
+              # jq is present on ubuntu-latest; keep fallback installer just in case.
+              if ! command -v jq >/dev/null 2>&1; then
+                sudo apt-get update -y && sudo apt-get install -y jq
+              fi
+
+              if pnpm changeset status --output=release.json 2>/dev/null; then
+                NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json)"
+                echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+                echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+                rm -f release.json
+              else
+                echo "No new changes to process, skipping version capture"
+                echo "NEW_VERSION=" >> "$GITHUB_ENV"
+                echo "new_version=" >> "$GITHUB_OUTPUT"
+              fi
+
+        - name: Create Release PR or Publish (Changesets)
+          id: maybe-changesets
+          if: ${{ inputs.use-changesets == 'true' }}
+          uses: changesets/action@v1
+          with:
+              title: ${{ inputs.changesets-title }}
+              commit: ${{ inputs.changesets-commit }}
+              version: ${{ inputs.version-command }}
+              publish: ${{ inputs.publish-command }}
+          env:
+              GITHUB_TOKEN: ${{ env.GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+              NPM_TOKEN: ${{ env.NPM_PUBLISH_TOKEN || secrets.NPM_PUBLISH_TOKEN }}
+              NODE_AUTH_TOKEN: ${{ env.NPM_PUBLISH_TOKEN || secrets.NPM_PUBLISH_TOKEN }}
+
+        # Optional PR back to base after publish
+        - name: Open PR → ${{ inputs.pr-base }}
+          id: open-pr
+          if: ${{ inputs.open-pr-to-base == 'true' && steps.maybe-changesets.outputs.published == 'true' }}
+          shell: bash
+          run: |
+              set -e
+              : "${GH_TOKEN:=${GITHUB_TOKEN}}"
+              : "${GH_TOKEN:?GH_TOKEN/GITHUB_TOKEN required for gh pr create}"
+              pr_url="$(gh pr create \
+                --head "${{ github.ref_name }}" \
+                --base "${{ inputs.pr-base }}" \
+                --title "${{ inputs.pr-title }}" \
+                --body "${{ inputs.pr-body }}" \
+                --repo "${{ github.repository }}" \
+                --fill --no-maintainer-edit 2>/dev/null || true)"
+              echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
+
+          env:
+              GH_TOKEN: ${{ env.GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+              GITHUB_TOKEN: ${{ env.GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
