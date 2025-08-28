@@ -18,12 +18,3 @@ This repository contains reusable **composite GitHub Actions** maintained by the
 -   [Publish Any Commit](.github/actions/publish-any-commit/README.md)  
     Preview-publish packages from any commit/PR using `pnpm dlx pkg-pr-new publish` for one or more package paths.
 
----
-
-## 🚀 Usage
-
-To use any action, reference it in your workflow like this:
-
-```yaml
-uses: technance-foundation/github-actions/.github/actions/<action-name>@main
-```
