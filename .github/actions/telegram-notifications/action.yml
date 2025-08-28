@@ -1,0 +1,81 @@
+name: "Telegram notifications"
+description: "GitHub Action to send Telegram notifications for pull request events"
+
+inputs:
+    to:
+        description: "Telegram chat ID to send notifications"
+        default: ""
+    token:
+        description: "Telegram bot token"
+        default: ""
+
+runs:
+    using: composite
+    steps:
+        - uses: actions/checkout@v4
+
+        - name: Opened
+          if: github.event.action == 'opened'
+          uses: appleboy/telegram-action@master
+          with:
+              to: ${{ inputs.to }}
+              token: ${{ inputs.token }}
+              message: |
+                  <b>${{ github.event.pull_request.draft && '✏️ Draft' || '📌' }} PR submitted at ${{ github.event.repository.name }}</b>            
+
+                  <i><a href="https://github.com/${{ github.actor }}">${{ github.actor }}</a> ${{ github.event.action }}${{ github.event.pull_request.draft && ' draft ' || ' ' }}PR#${{ github.event.number }}</i>
+                  <a href="${{ github.event.pull_request.html_url }}">Click here to view → ${{ github.event.pull_request.title }}</a>
+              format: html
+              disable_web_page_preview: true
+
+        - name: Ready for review
+          if: github.event.action == 'ready_for_review'
+          uses: appleboy/telegram-action@master
+          with:
+              to: ${{ inputs.to }}
+              token: ${{ inputs.token }}
+              message: |
+                  <i>🟡 <a href="https://github.com/${{ github.actor }}">${{ github.actor }}</a> marked PR#${{ github.event.pull_request.number }} as ready for review</i> 
+
+                  <a href="${{ github.event.pull_request.html_url }}">Click here to view → ${{ github.event.pull_request.title }}</a>
+              format: html
+              disable_web_page_preview: true
+
+        - name: Commented
+          if: github.event.review.state == 'commented'
+          uses: appleboy/telegram-action@master
+          with:
+              to: ${{ inputs.to }}
+              token: ${{ inputs.token }}
+              message: |
+                  <i>💬 <a href="https://github.com/${{ github.actor }}">${{ github.actor }}</a> reviewed and left comment(s) on PR#${{ github.event.pull_request.number }}</i>
+
+                  <a href="${{ github.event.review.html_url }}">➡️ View comment(s)</a>
+              format: html
+              disable_web_page_preview: true
+
+        - name: Approved
+          if: github.event.review.state == 'approved'
+          uses: appleboy/telegram-action@master
+          with:
+              to: ${{ inputs.to }}
+              token: ${{ inputs.token }}
+              message: |
+                  <i>✅ <a href="https://github.com/${{ github.actor }}">${{ github.actor }}</a> approved PR #${{ github.event.pull_request.number }}</i>
+
+                  <a href="${{ github.event.review.html_url }}">➡️ View comment(s)</a>
+              format: html
+              disable_web_page_preview: true
+
+        - name: Changes requested
+          if: github.event.review.state == 'changes_requested'
+          uses: appleboy/telegram-action@master
+          with:
+              to: ${{ inputs.to }}
+              token: ${{ inputs.token }}
+              message: |
+                  <i>🔄 <a href="https://github.com/${{ github.actor }}">${{ github.actor }}</a> requested changes on PR#${{ github.event.pull_request.number }}</i>
+
+                  <a href="${{ github.event.review.html_url }}">➡️ View comment(s)</a>
+              format: html
+              disable_web_page_preview: true
