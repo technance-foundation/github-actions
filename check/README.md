@@ -33,7 +33,7 @@ jobs:
     check:
         runs-on: ubuntu-latest
         steps:
-            - uses: technance-foundation/github-actions/.github/actions/check@main
+            - uses: technance-foundation/github-actions/check@main
               with:
                   node-version: "20"
                   pnpm-version: "9.0.6"

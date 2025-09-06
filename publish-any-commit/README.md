@@ -26,13 +26,13 @@ jobs:
     build:
         runs-on: ubuntu-latest
         steps:
-            - uses: technance-foundation/github-actions/.github/actions/publish-any-commit@main
+            - uses: technance-foundation/github-actions/publish-any-commit@main
 ```
 
 ## Target a Single Package
 
 ```yaml
-- uses: technance-foundation/github-actions/.github/actions/publish-any-commit@main
+- uses: technance-foundation/github-actions/publish-any-commit@main
   with:
       package-paths: "./packages/worphling"
 ```
@@ -40,7 +40,7 @@ jobs:
 ## Target Multiple Packages
 
 ```yaml
-- uses: technance-foundation/github-actions/.github/actions/publish-any-commit@main
+- uses: technance-foundation/github-actions/publish-any-commit@main
   with:
       package-paths: |
           ./packages/nova

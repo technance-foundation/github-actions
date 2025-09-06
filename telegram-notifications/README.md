@@ -30,7 +30,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Telegram Notify
-              uses: technance-foundation/github-actions/.github/actions/telegram-notifications@main
+              uses: technance-foundation/github-actions/telegram-notifications@main
               with:
                   to: ${{ secrets.TELEGRAM_TO }}
                   token: ${{ secrets.TELEGRAM_TOKEN }}
