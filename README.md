@@ -18,3 +18,6 @@ This repository contains reusable **composite GitHub Actions** maintained by the
 -   [Publish Any Commit](.github/actions/publish-any-commit/README.md)  
     Preview-publish packages from any commit/PR using `pnpm dlx pkg-pr-new publish` for one or more package paths.
 
+-   [Load Env](.github/actions/load-env/README.md)  
+    Loads environment variables from a .env file into the job environment
+

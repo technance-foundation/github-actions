@@ -1,0 +1,23 @@
+name: "Load Env"
+description: "Loads environment variables from a .env file into the job environment"
+inputs:
+    file:
+        description: "Path to the .env file"
+        required: true
+
+runs:
+    using: "composite"
+    steps:
+        - name: Load .env file into GITHUB_ENV
+          shell: bash
+          run: |
+              if [ ! -f "${{ inputs.file }}" ]; then
+                echo "Env file '${{ inputs.file }}' not found!"
+                exit 1
+              fi
+
+              # NOTE(rzvxa): strip comments and blank lines, append to GITHUB_ENV
+              grep -v '^\s*#' "${{ inputs.file }}" | grep -v '^\s*$' >> "$GITHUB_ENV"
+
+              echo "Loaded environment variables from ${{ inputs.file }}"
+
