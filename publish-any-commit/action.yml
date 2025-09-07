@@ -41,6 +41,9 @@ inputs:
         description: "NPM registry URL"
         default: "https://registry.npmjs.org"
         required: false
+    npm-token:
+        description: "NPM token for authentication (optional)"
+        required: false
 
     # Commands
     install-command:
@@ -106,11 +109,11 @@ runs:
                   **/pnpm-lock.yaml
 
         - name: Authenticate NPM registry (optional)
-          if: ${{ env.NPM_TOKEN != '' }}
+          if: ${{ inputs.npm-token != '' }}
           shell: bash
           working-directory: ${{ inputs.working-directory }}
           env:
-              NPM_TOKEN: ${{ env.NPM_TOKEN }}
+              NPM_TOKEN: ${{ inputs.npm-token }}
           run: |
               echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
 
