@@ -109,6 +109,8 @@ runs:
           if: ${{ env.NPM_TOKEN != '' }}
           shell: bash
           working-directory: ${{ inputs.working-directory }}
+          env:
+              NPM_TOKEN: ${{ env.NPM_TOKEN }}
           run: |
               echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
 
