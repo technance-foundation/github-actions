@@ -41,6 +41,17 @@ jobs:
               uses: technance-foundation/github-actions/release@main
 ```
 
+## With NPM Authentication
+
+If you need to authenticate with a private NPM registry:
+
+```yaml
+- name: Release
+  uses: technance-foundation/github-actions/release@main
+  with:
+      npm-token: ${{ secrets.NPM_TOKEN }}
+```
+
 ## Advanced Usage
 
 Override Node version, working dir, custom commands, and PR behavior:
@@ -73,6 +84,7 @@ steps:
 | `pnpm-version`                 | `9.0.6`                                      | pnpm version                                     |
 | `cache`                        | `pnpm`                                       | setup-node cache strategy                        |
 | `npm-registry`                 | `https://registry.npmjs.org`                 | Registry URL                                     |
+| `npm-token`                    |                                              | NPM token for authentication (optional)          |
 | `install-command`              | `pnpm install --frozen-lockfile`             | Install                                          |
 | `build-command`                | `pnpm build`                                 | Build                                            |
 | `version-command`              | `pnpm run bump`                              | Changesets version command                       |
@@ -98,6 +110,7 @@ steps:
 ## Requirements
 
 -   Workflow must grant permissions: `contents: write`, `pull-requests: write`, `id-token: write`.
+-   `npm-token` input is optional - only needed for private registry authentication.
 -   Env/Secrets expected:
 
     -   `GITHUB_TOKEN` (provided by GitHub)

@@ -29,6 +29,16 @@ jobs:
             - uses: technance-foundation/github-actions/publish-any-commit@main
 ```
 
+## With NPM Authentication
+
+If you need to authenticate with a private NPM registry:
+
+```yaml
+- uses: technance-foundation/github-actions/publish-any-commit@main
+  with:
+      npm-token: ${{ secrets.NPM_TOKEN }}
+```
+
 ## Target a Single Package
 
 ```yaml
@@ -72,6 +82,7 @@ with:
 | `pnpm-version`          | `9.0.6`                          | pnpm version                                           |
 | `cache`                 | `pnpm`                           | setup-node cache strategy                              |
 | `npm-registry`          | `https://registry.npmjs.org`     | Registry URL                                           |
+| `npm-token`             |                                  | NPM token for authentication (optional)                |
 | `install-command`       | `pnpm install --frozen-lockfile` | Install                                                |
 | `build-command`         | `pnpm build`                     | Build (set to `""` to skip)                            |
 | `package-paths`         | `.`                              | One or more package paths (newline or space-separated) |
@@ -81,7 +92,7 @@ with:
 
 ## Requirements
 
--   `NPM_TOKEN` must be set in `env:` (for registry authentication).
+-   `npm-token` input is optional - only needed for private registry authentication.
 -   The workflow that uses this action typically runs on:
 
     ```yaml
