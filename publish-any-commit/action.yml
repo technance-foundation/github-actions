@@ -108,7 +108,7 @@ runs:
               cache-dependency-path: |
                   **/pnpm-lock.yaml
 
-        - name: Authenticate NPM registry (optional)
+        - name: Authenticate registry (optional)
           if: ${{ inputs.npm-token != '' }}
           shell: bash
           working-directory: ${{ inputs.working-directory }}
@@ -120,12 +120,16 @@ runs:
         - name: Install dependencies
           shell: bash
           working-directory: ${{ inputs.working-directory }}
+          env:
+              NODE_AUTH_TOKEN: ${{ inputs.npm-token }}
           run: ${{ inputs.install-command }}
 
         - name: Build (optional)
           if: ${{ inputs.build-command != '' }}
           shell: bash
           working-directory: ${{ inputs.working-directory }}
+          env:
+              NODE_AUTH_TOKEN: ${{ inputs.npm-token }}
           run: ${{ inputs.build-command }}
 
         - name: Publish with pkg-pr-new
@@ -135,6 +139,7 @@ runs:
               _PKG_PR_VERSION: ${{ inputs.pkg-pr-new-version }}
               _PKG_PR_EXTRA_ARGS: ${{ inputs.pkg-pr-new-extra-args }}
               _PACKAGE_PATHS_RAW: ${{ inputs.package-paths }}
+              NODE_AUTH_TOKEN: ${{ inputs.npm-token }}
           run: |
               set -euo pipefail
 
