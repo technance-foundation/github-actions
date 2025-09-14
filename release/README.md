@@ -92,8 +92,9 @@ steps:
 | `use-changesets`               | `true`                                       | Toggle changesets/action                         |
 | `changesets-title`             | `Release v\${{ env.NEW_VERSION }}`           | Title for release PR                             |
 | `changesets-commit`            | `Release v\${{ env.NEW_VERSION }}`           | Commit message                                   |
+| `changesets-base-branch`       | `main`                                       | Base branch for changesets version comparison    |
 | `open-pr-to-base`              | `true`                                       | Open PR back to base after publish               |
-| `pr-base`                      | `main`                                       | Base branch                                      |
+| `pr-base`                      | `main`                                       | Target branch for back-merge PR                  |
 | `pr-title`                     | `Merge \${{ github.ref_name }} back to main` | Back-merge PR title                              |
 | `pr-body`                      | `Auto-generated after publishing.`           | Back-merge PR body                               |
 | `working-directory`            |                                              | Directory to run commands in                     |
