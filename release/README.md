@@ -75,30 +75,30 @@ steps:
 
 ## Inputs
 
-| Name                           | Default                                      | Description                                      |
-| ------------------------------ | -------------------------------------------- | ------------------------------------------------ |
-| `fetch-depth`                  | `0`                                          | Checkout depth                                   |
-| `ref`                          | `${{ github.ref }}`                          | Ref to checkout                                  |
-| `node-version-file`            | `.nvmrc`                                     | Path to `.nvmrc` (ignored if `node-version` set) |
-| `node-version`                 |                                              | Explicit Node version                            |
-| `pnpm-version`                 | `9.0.6`                                      | pnpm version                                     |
-| `cache`                        | `pnpm`                                       | setup-node cache strategy                        |
-| `npm-registry`                 | `https://registry.npmjs.org`                 | Registry URL                                     |
-| `npm-token`                    |                                              | NPM token for authentication (optional)          |
-| `install-command`              | `pnpm install --frozen-lockfile`             | Install                                          |
-| `build-command`                | `pnpm build`                                 | Build                                            |
-| `version-command`              | `pnpm run bump`                              | Changesets version command                       |
-| `publish-command`              | `pnpm run release`                           | Publish command                                  |
-| `use-changesets`               | `true`                                       | Toggle changesets/action                         |
-| `changesets-title`             | `Release v\${{ env.NEW_VERSION }}`           | Title for release PR                             |
-| `changesets-commit`            | `Release v\${{ env.NEW_VERSION }}`           | Commit message                                   |
-| `changesets-base-branch`       | `main`                                       | Base branch for changesets version comparison    |
-| `open-pr-to-base`              | `true`                                       | Open PR back to base after publish               |
-| `pr-base`                      | `main`                                       | Target branch for back-merge PR                  |
-| `pr-title`                     | `Merge \${{ github.ref_name }} back to main` | Back-merge PR title                              |
-| `pr-body`                      | `Auto-generated after publishing.`           | Back-merge PR body                               |
-| `working-directory`            |                                              | Directory to run commands in                     |
-| `continue-on-empty-changesets` | `true`                                       | Skip version capture when no changesets          |
+| Name                           | Default                                                        | Description                                      |
+| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------ |
+| `fetch-depth`                  | `0`                                                            | Checkout depth                                   |
+| `ref`                          | `${{ github.ref }}`                                            | Ref to checkout                                  |
+| `node-version-file`            | `.nvmrc`                                                       | Path to `.nvmrc` (ignored if `node-version` set) |
+| `node-version`                 |                                                                | Explicit Node version                            |
+| `pnpm-version`                 | `9.0.6`                                                        | pnpm version                                     |
+| `cache`                        | `pnpm`                                                         | setup-node cache strategy                        |
+| `npm-registry`                 | `https://registry.npmjs.org`                                   | Registry URL                                     |
+| `npm-token`                    |                                                                | NPM token for authentication (optional)          |
+| `install-command`              | `pnpm install --frozen-lockfile`                               | Install                                          |
+| `build-command`                | `pnpm build`                                                   | Build                                            |
+| `version-command`              | `pnpm run bump`                                                | Changesets version command                       |
+| `publish-command`              | `pnpm run release`                                             | Publish command                                  |
+| `use-changesets`               | `true`                                                         | Toggle changesets/action                         |
+| `changesets-title`             | `Release v\${{ env.NEW_VERSION }}`                             | Title for release PR                             |
+| `changesets-commit`            | `Release v\${{ env.NEW_VERSION }}`                             | Commit message                                   |
+| `changesets-base-branch`       | `main`                                                         | Base branch for changesets version comparison    |
+| `open-pr-to-base`              | `true`                                                         | Open PR back to base after publish               |
+| `pr-base`                      | `main`                                                         | Target branch for back-merge PR                  |
+| `pr-title`                     | `Merge \${{ github.ref_name }} back to \${{ inputs.pr-base }}` | Back-merge PR title                              |
+| `pr-body`                      | `Auto-generated after publishing.`                             | Back-merge PR body                               |
+| `working-directory`            |                                                                | Directory to run commands in                     |
+| `continue-on-empty-changesets` | `true`                                                         | Skip version capture when no changesets          |
 
 ## Outputs
 

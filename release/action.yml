@@ -93,7 +93,7 @@ inputs:
         required: false
     pr-title:
         description: "Title for the back-merge PR"
-        default: "Merge ${{ github.ref_name }} back to ${{ inputs.pr-base }}"
+        default: ""
         required: false
     pr-body:
         description: "Body for the back-merge PR"
@@ -214,10 +214,16 @@ runs:
               set -e
               : "${GH_TOKEN:=${GITHUB_TOKEN}}"
               : "${GH_TOKEN:?GH_TOKEN/GITHUB_TOKEN required for gh pr create}"
+              # Determine PR title: use input if provided, else compute a sensible default
+              input_title="${{ inputs.pr-title }}"
+              if [ -z "${input_title}" ]; then
+                branch_name="${GITHUB_REF_NAME}"
+                input_title="Merge ${branch_name} back to ${{ inputs.pr-base }}"
+              fi
               pr_url="$(gh pr create \
                 --head "${{ github.ref_name }}" \
                 --base "${{ inputs.pr-base }}" \
-                --title "${{ inputs.pr-title }}" \
+                --title "${input_title}" \
                 --body "${{ inputs.pr-body }}" \
                 --repo "${{ github.repository }}" \
                 --fill --no-maintainer-edit 2>/dev/null || true)"
