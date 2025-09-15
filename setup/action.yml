@@ -1,0 +1,63 @@
+name: "Setup Workflow"
+description: "A reusable GitHub Action for setting up a `pnpm` repository with for the subsequent steps"
+
+inputs:
+    node-version:
+        description: "The version of Node.js to use"
+        default: "20"
+    pnpm-version:
+        description: "The version of pnpm to use"
+        default: "9.0.6"
+    npm-token:
+        description: "NPM token for authenticating to the NPM registry"
+        required: true
+    install:
+        description: "Either false to skip or the build command to run, default is `pnpm install --no-frozen-lockfile`"
+        default: "pnpm install --no-frozen-lockfile"
+    build:
+        description: "Either false or the build command to run, default is `pnpm build`"
+        default: "pnpm build"
+
+runs:
+    using: "composite"
+    steps:
+        - name: Setup Node.js
+          uses: actions/setup-node@v4
+          with:
+              node-version: ${{ inputs.node-version }}
+
+        - name: Setup pnpm
+          id: pnpm-setup
+          uses: pnpm/action-setup@v4
+          with:
+              version: ${{ inputs.pnpm-version }}
+              run_install: false
+
+        - name: Get pnpm store directory
+          id: pnpm-cache
+          shell: bash
+          run: |
+              echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+        - uses: actions/cache@v4
+          name: Initialize pnpm cache
+          with:
+              path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+              key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/package.json') }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+              restore-keys: |
+                  ${{ runner.os }}-pnpm-store-${{ hashFiles('**/package.json') }}-
+                  ${{ runner.os }}-pnpm-store-
+
+        - name: Authenticate NPM registry
+          shell: bash
+          run: echo "//registry.npmjs.org/:_authToken=${{ inputs.npm-token }}" > ~/.npmrc
+
+        - name: Install dependencies
+          if: ${{ inputs.install != 'false' }}
+          shell: bash
+          run: ${{ inputs.install }}
+
+        - name: Install dependencies
+          if: ${{ inputs.build != 'false' }}
+          shell: bash
+          run: ${{ inputs.build }}
