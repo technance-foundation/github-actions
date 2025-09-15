@@ -9,6 +9,9 @@ This repository contains reusable **composite GitHub Actions** maintained by the
 -   [Check](check/README.md)
     Run project checks such as linting, formatting, and testing with Node.js + pnpm.
 
+-   [Setup](setup/README.md)
+    A reusable GitHub Action for setting up a `pnpm` repository with for the subsequent steps
+
 -   [Telegram Notifications](telegram-notifications/README.md)
     Send GitHub event notifications to a Telegram chat.
 
