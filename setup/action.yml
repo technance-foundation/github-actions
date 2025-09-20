@@ -8,6 +8,9 @@ inputs:
     pnpm-version:
         description: "The version of pnpm to use"
         default: "9.0.6"
+    pnpm-cache:
+        description: "Cache strategy can be one of `read`, `write`, or `off`"
+        default: "write"
     npm-token:
         description: "NPM token for authenticating to the NPM registry"
         required: true
@@ -17,9 +20,6 @@ inputs:
     build:
         description: "Either false or the build command to run, default is `pnpm build`"
         default: "pnpm build"
-    pnpm-cache:
-        description: "Cache strategy can be one of `read`, `write`, or `off`"
-        default: "write"
 
 runs:
     using: "composite"
