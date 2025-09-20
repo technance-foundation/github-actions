@@ -18,6 +18,7 @@ It handles environment setup, dependency installation, caching, and optional bui
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `node-version` | The version of Node.js to use. Default is `20`.                                                                                  |
 | `pnpm-version` | The version of pnpm to use. Default is `9.0.6`.                                                                                  |
+| `pnpm-cache`   | Cache strategy can be one of `read`, `write`, or `off`. Default is `write`                                                       |
 | `npm-token`    | NPM token for authenticating to the NPM registry. Required if installing from private packages.                                  |
 | `install`      | Either `"false"` to skip installing dependencies, or the install command to run. Default is `pnpm install --no-frozen-lockfile`. |
 | `build`        | Either `"false"` to skip building, or the build command to run. Default is `pnpm build`.                                         |

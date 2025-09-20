@@ -8,6 +8,9 @@ inputs:
     pnpm-version:
         description: "The version of pnpm to use"
         default: "9.0.6"
+    pnpm-cache:
+        description: "Cache strategy can be one of `read`, `write`, or `off`"
+        default: "write"
     npm-token:
         description: "NPM token for authenticating to the NPM registry"
         required: true
@@ -39,7 +42,18 @@ runs:
           run: |
               echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
+        - uses: actions/cache/restore@v4
+          if: ${{ inputs.pnpm-cache == 'read' }}
+          name: Initialize pnpm cache
+          with:
+              path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+              key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/package.json') }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+              restore-keys: |
+                  ${{ runner.os }}-pnpm-store-${{ hashFiles('**/package.json') }}-
+                  ${{ runner.os }}-pnpm-store-
+
         - uses: actions/cache@v4
+          if: ${{ inputs.pnpm-cache == 'write' }}
           name: Initialize pnpm cache
           with:
               path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
