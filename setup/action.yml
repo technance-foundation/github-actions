@@ -71,7 +71,7 @@ runs:
           shell: bash
           run: ${{ inputs.install }}
 
-        - name: Install dependencies
+        - name: Build
           if: ${{ inputs.build != 'false' }}
           shell: bash
           run: ${{ inputs.build }}
