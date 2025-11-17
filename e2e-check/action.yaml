@@ -1,0 +1,52 @@
+name: "E2E Check Runner"
+description: "Reusable action to update GitHub Check Runs for E2E tests (in_progress or completed)."
+
+inputs:
+    token:
+        description: "GitHub token with permissions to update checks"
+        required: true
+    check-run-id:
+        description: "ID of the check run to update"
+        required: true
+    state:
+        description: "One of: in_progress | completed"
+        required: true
+    job-status:
+        description: "Success or failure (required only when state=completed)"
+        required: false
+    project:
+        description: "Project/app name (only used when state=completed)"
+        required: false
+    preview-url:
+        description: "Preview URL (only used when state=completed)"
+        required: false
+
+runs:
+    using: composite
+    steps:
+        - uses: actions/checkout@v4
+
+        - name: Mark check as in_progress
+          if: ${{ inputs.state == 'in_progress' }}
+          uses: actions/github-script@v7
+          env:
+              CHECK_RUN_ID: ${{ inputs.check-run-id }}
+          with:
+              github-token: ${{ inputs.token }}
+              script: |
+                  const run = require('./e2e-check/mark-in-progress.cjs');
+                  await run({ github, context, core });
+
+        - name: Complete check
+          if: ${{ inputs.state == 'completed' }}
+          uses: actions/github-script@v7
+          env:
+              CHECK_RUN_ID: ${{ inputs.check-run-id }}
+              PROJECT: ${{ inputs.project }}
+              PREVIEW_URL: ${{ inputs.preview-url }}
+              JOB_STATUS: ${{ inputs.job-status }}
+          with:
+              github-token: ${{ inputs.token }}
+              script: |
+                  const run = require('./e2e-check/complete-check.cjs');
+                  await run({ github, context, core });
