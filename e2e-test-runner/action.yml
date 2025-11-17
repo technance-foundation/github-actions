@@ -35,8 +35,21 @@ inputs:
         required: true
 
 runs:
-    using: "composite"
+    using: composite
     steps:
+        # =========================================================
+        # CHECK OUT ACTION SOURCE SO nested e2e-check works
+        # =========================================================
+        - name: Checkout action source
+          uses: actions/checkout@v4
+          with:
+              repository: technance-foundation/github-actions
+              ref: main
+              sparse-checkout: |
+                  e2e-check
+                  e2e-test-runner
+              sparse-checkout-cone-mode: false
+
         # -----------------------------------------------------
         # MARK CHECK AS IN_PROGRESS
         # -----------------------------------------------------
@@ -61,7 +74,7 @@ runs:
               build: "false"
 
         # -----------------------------------------------------
-        # PLAYWRIGHT BROWSER CACHING
+        # BROWSER CACHING
         # -----------------------------------------------------
         - name: Cache Playwright browsers
           id: cache-playwright
@@ -78,7 +91,7 @@ runs:
           run: pnpm exec playwright install --with-deps chromium
 
         # -----------------------------------------------------
-        # RUN E2E TESTS
+        # RUN TESTS
         # -----------------------------------------------------
         - name: Run E2E tests
           shell: bash
@@ -88,7 +101,7 @@ runs:
           run: pnpm run test:e2e
 
         # -----------------------------------------------------
-        # UPLOAD REPORT
+        # REPORT
         # -----------------------------------------------------
         - name: Upload Playwright report
           if: always()
@@ -99,7 +112,7 @@ runs:
               retention-days: 30
 
         # -----------------------------------------------------
-        # MARK CHECK AS COMPLETED
+        # COMPLETE CHECK
         # -----------------------------------------------------
         - name: Complete check
           if: always()

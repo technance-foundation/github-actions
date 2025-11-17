@@ -29,6 +29,18 @@ inputs:
 runs:
     using: composite
     steps:
+        # =========================================================
+        # CHECK OUT ACTION SOURCE SO require() WORKS
+        # =========================================================
+        - name: Checkout action source
+          uses: actions/checkout@v4
+          with:
+              repository: technance-foundation/github-actions
+              ref: main
+              sparse-checkout: |
+                  e2e-check
+              sparse-checkout-cone-mode: false
+
         # -----------------------------
         # DEBUG 1: Print inputs
         # -----------------------------
@@ -99,7 +111,7 @@ runs:
           with:
               github-token: ${{ inputs.token }}
               script: |
-                  const run = require('./mark-in-progress.cjs');
+                  const run = require('./e2e-check/mark-in-progress.cjs');
                   await run({ github, context, core });
 
         - name: Complete check
@@ -113,5 +125,5 @@ runs:
           with:
               github-token: ${{ inputs.token }}
               script: |
-                  const run = require('./complete-check.cjs');
+                  const run = require('./e2e-check/complete-check.cjs');
                   await run({ github, context, core });
