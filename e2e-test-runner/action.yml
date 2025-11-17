@@ -1,0 +1,118 @@
+name: "E2E Test Runner"
+description: "Runs Playwright E2E tests, manages setup, caching, reports, and GitHub Check Runs."
+
+inputs:
+    token:
+        description: "GitHub token with permissions to update checks"
+        required: true
+
+    check-run-id:
+        description: "GitHub Check Run ID"
+        required: true
+
+    project:
+        description: "Project/app name (used for report folder and summary)"
+        required: true
+
+    preview-url:
+        description: "Preview deployment base URL for the tests (BASE_URL)"
+        required: true
+
+    node-version:
+        description: "Node.js version"
+        default: "22"
+
+    pnpm-version:
+        description: "PNPM version"
+        default: "10.15.0"
+
+    playwright-version:
+        description: "Playwright version (for caching)"
+        default: "1.53.2"
+
+    npm-token:
+        description: "NPM token for installing private dependencies"
+        required: true
+
+runs:
+    using: "composite"
+    steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+          with:
+              fetch-depth: 1
+
+        # -----------------------------------------------------
+        # MARK CHECK AS IN_PROGRESS
+        # -----------------------------------------------------
+        - name: Mark check as in_progress
+          uses: technance-foundation/github-actions/e2e-check@main
+          with:
+              token: ${{ inputs.token }}
+              check-run-id: ${{ inputs.check-run-id }}
+              state: in_progress
+
+        # -----------------------------------------------------
+        # SETUP & DEPENDENCIES
+        # -----------------------------------------------------
+        - name: Setup & install (root)
+          uses: technance-foundation/github-actions/setup@main
+          with:
+              node-version: ${{ inputs.node-version }}
+              pnpm-version: ${{ inputs.pnpm-version }}
+              npm-token: ${{ inputs.npm-token }}
+              pnpm-cache: "write"
+              install: "pnpm install --no-frozen-lockfile"
+              build: "false"
+
+        # -----------------------------------------------------
+        # PLAYWRIGHT BROWSER CACHING
+        # -----------------------------------------------------
+        - name: Cache Playwright browsers
+          id: cache-playwright
+          uses: actions/cache@v4
+          with:
+              path: ~/.cache/ms-playwright
+              key: ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+              restore-keys: |
+                  ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-
+
+        - name: Install Playwright deps + browsers (cache miss)
+          if: steps.cache-playwright.outputs.cache-hit != 'true'
+          shell: bash
+          run: pnpm exec playwright install --with-deps chromium
+
+        # -----------------------------------------------------
+        # RUN E2E TESTS
+        # -----------------------------------------------------
+        - name: Run E2E tests
+          shell: bash
+          working-directory: apps/${{ inputs.project }}
+          env:
+              BASE_URL: ${{ inputs.preview-url }}
+          run: pnpm run test:e2e
+
+        # -----------------------------------------------------
+        # UPLOAD REPORT
+        # -----------------------------------------------------
+        - name: Upload Playwright report
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+              name: ${{ inputs.project }}-playwright-report
+              path: apps/${{ inputs.project }}/playwright-report/
+              retention-days: 30
+
+        # -----------------------------------------------------
+        # MARK CHECK AS COMPLETED
+        # -----------------------------------------------------
+        - name: Complete check
+          if: always()
+          uses: technance-foundation/github-actions/e2e-check@main
+          with:
+              token: ${{ inputs.token }}
+              check-run-id: ${{ inputs.check-run-id }}
+              state: completed
+              job-status: ${{ job.status }}
+              project: ${{ inputs.project }}
+              preview-url: ${{ inputs.preview-url }}
