@@ -11,7 +11,12 @@ Complete reusable GitHub Action that:
 -   Uploads Playwright HTML report
 -   Marks GitHub Check Run as **completed**
 
-This replaces 20+ lines of workflow steps with one action.
+### About the Relay
+
+This action doesn’t run on its own.  
+It’s usually triggered by our **E2E Relay**, a lightweight service that waits for a preview deployment to go live and then starts the workflow with the correct metadata (preview URL, project name, and check run ID).
+
+If you’re curious how that works, see: [RELAY.md](../RELAY.md)
 
 ---
 
