@@ -18,9 +18,9 @@ This action wraps the logic from our relay-driven E2E system and allows any work
 | `token`        | ✔️       | GitHub token with `checks: write` permission        |
 | `check-run-id` | ✔️       | Check run to update                                 |
 | `state`        | ✔️       | `"in_progress"` or `"completed"`                    |
-| `job-status`   | ❌       | `"success"` or `"failure"` (required for completed) |
-| `project`      | ❌       | Project/app name (completed only)                   |
-| `preview-url`  | ❌       | Preview deployment URL (completed only)             |
+| `job-status`   | –        | `"success"` or `"failure"` (required for completed) |
+| `project`      | –        | Project/app name (completed only)                   |
+| `preview-url`  | –        | Preview deployment URL (completed only)             |
 
 ---
 
