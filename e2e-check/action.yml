@@ -30,13 +30,14 @@ runs:
     using: composite
     steps:
         # =========================================================
-        # CHECK OUT ACTION SOURCE SO require() WORKS
+        # FIX: safe checkout (does NOT override caller repo)
         # =========================================================
         - name: Checkout action source
           uses: actions/checkout@v4
           with:
               repository: technance-foundation/github-actions
               ref: main
+              path: ./.github/actions/github-actions
               sparse-checkout: |
                   e2e-check
               sparse-checkout-cone-mode: false
@@ -111,7 +112,7 @@ runs:
           with:
               github-token: ${{ inputs.token }}
               script: |
-                  const run = require('./e2e-check/mark-in-progress.cjs');
+                  const run = require('./.github/actions/github-actions/e2e-check/mark-in-progress.cjs');
                   await run({ github, context, core });
 
         - name: Complete check
@@ -125,5 +126,5 @@ runs:
           with:
               github-token: ${{ inputs.token }}
               script: |
-                  const run = require('./e2e-check/complete-check.cjs');
+                  const run = require('./.github/actions/github-actions/e2e-check/complete-check.cjs');
                   await run({ github, context, core });

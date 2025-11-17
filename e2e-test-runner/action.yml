@@ -38,13 +38,14 @@ runs:
     using: composite
     steps:
         # =========================================================
-        # CHECK OUT ACTION SOURCE SO nested e2e-check works
+        # Check out action source WITHOUT wiping caller repo
         # =========================================================
         - name: Checkout action source
           uses: actions/checkout@v4
           with:
               repository: technance-foundation/github-actions
               ref: main
+              path: ./.github/actions/github-actions
               sparse-checkout: |
                   e2e-check
                   e2e-test-runner
