@@ -32,7 +32,7 @@ runs:
           with:
               github-token: ${{ inputs.token }}
               script: |
-                  const run = require('./e2e-check/mark-in-progress.cjs');
+                  const run = require('./mark-in-progress.cjs');
                   await run({ github, context, core });
 
         - name: Complete check
@@ -46,5 +46,5 @@ runs:
           with:
               github-token: ${{ inputs.token }}
               script: |
-                  const run = require('./e2e-check/complete-check.cjs');
+                  const run = require('./complete-check.cjs');
                   await run({ github, context, core });
