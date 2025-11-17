@@ -5,18 +5,23 @@ inputs:
     token:
         description: "GitHub token with permissions to update checks"
         required: true
+
     check-run-id:
         description: "ID of the check run to update"
         required: true
+
     state:
         description: "One of: in_progress | completed"
         required: true
+
     job-status:
         description: "Success or failure (required only when state=completed)"
         required: false
+
     project:
         description: "Project/app name (only used when state=completed)"
         required: false
+
     preview-url:
         description: "Preview URL (only used when state=completed)"
         required: false
@@ -24,6 +29,68 @@ inputs:
 runs:
     using: composite
     steps:
+        # -----------------------------
+        # DEBUG 1: Print inputs
+        # -----------------------------
+        - name: DEBUG — Print Inputs
+          shell: bash
+          run: |
+              echo "### E2E CHECK — DEBUG (Inputs)"
+              echo "state=${{ inputs.state }}"
+              echo "check-run-id=${{ inputs.check-run-id }}"
+              echo "job-status=${{ inputs.job-status }}"
+              echo "project=${{ inputs.project }}"
+              echo "preview-url=${{ inputs.preview-url }}"
+
+        # -----------------------------
+        # DEBUG 2: Print GitHub env
+        # -----------------------------
+        - name: DEBUG — GitHub Context
+          shell: bash
+          run: |
+              echo "### E2E CHECK — DEBUG (Context)"
+              echo "GITHUB_WORKFLOW=$GITHUB_WORKFLOW"
+              echo "GITHUB_JOB=$GITHUB_JOB"
+              echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+              echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+              echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+              echo "GITHUB_SHA=$GITHUB_SHA"
+              echo "GITHUB_REF=$GITHUB_REF"
+
+        # -----------------------------
+        # DEBUG 3: Ensure check run exists
+        # -----------------------------
+        - name: DEBUG — Validate Check Run Exists
+          uses: actions/github-script@v7
+          env:
+              CHECK_RUN_ID: ${{ inputs.check-run-id }}
+          with:
+              github-token: ${{ inputs.token }}
+              script: |
+                  core.info("### E2E CHECK — DEBUG (Check Run Lookup)");
+                  const id = Number(process.env.CHECK_RUN_ID);
+                  const { owner, repo } = context.repo;
+
+                  try {
+                      const res = await github.rest.checks.get({
+                          owner, repo, check_run_id: id
+                      });
+                      core.info("Check Run Found:");
+                      core.info(JSON.stringify({
+                          id: res.data.id,
+                          status: res.data.status,
+                          conclusion: res.data.conclusion,
+                          name: res.data.name
+                      }, null, 2));
+                  } catch (err) {
+                      core.error("❌ Failed to fetch check run");
+                      core.error(err);
+                      throw err;
+                  }
+
+        # -----------------------------
+        # EXECUTION
+        # -----------------------------
         - name: Mark check as in_progress
           if: ${{ inputs.state == 'in_progress' }}
           uses: actions/github-script@v7
