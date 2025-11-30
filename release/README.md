@@ -7,7 +7,7 @@ Reusable composite action that standardizes the **release workflow**:
 -   Install & build
 -   Capture new version via Changesets
 -   Create Release PR **or** publish (using `changesets/action@v1`)
--   Optionally open a PR back to your base branch after a successful publish
+-   Optionally create and auto squash-merge a PR back to your base branch after a successful publish
 
 ## Minimal Usage
 
@@ -69,44 +69,73 @@ steps:
           version-command: "pnpm run bump"
           publish-command: "pnpm run release"
           pr-base: "main"
-          pr-title: "Merge ${{ github.ref_name }} back to main"
-          pr-body: "Auto-generated after publishing."
+          auto-merge: true
 ```
+
+## Dynamic PR Titles
+
+The action generates distinct titles for the two PRs in the release flow:
+
+| Packages    | Prepare PR (version bumps)               | Release PR (back-merge)          |
+| ----------- | ---------------------------------------- | -------------------------------- |
+| 1 package   | `` Prepare release `@scope/pkg@1.2.3` `` | `` Publish `@scope/pkg@1.2.3` `` |
+| 2+ packages | `Prepare new releases`                   | `Publish new releases`           |
+
+This keeps your PR history clear and your commit history on `main` clean:
+
+```
+abc1234 Publish `@myorg/utils@2.1.0`
+ghi9012 Publish `@myorg/core@3.0.0`
+```
+
+## Back-Merge Behavior
+
+After a successful publish, the action can automatically merge the release branch back to your base branch:
+
+| Configuration                                | Behavior                                        |
+| -------------------------------------------- | ----------------------------------------------- |
+| `open-pr-to-base: true`, `auto-merge: true`  | Creates PR and immediately squash-merges it     |
+| `open-pr-to-base: true`, `auto-merge: false` | Creates PR but leaves it open for manual review |
+| `open-pr-to-base: false`                     | No back-merge PR created                        |
 
 ## Inputs
 
-| Name                           | Default                                                        | Description                                      |
-| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------ |
-| `fetch-depth`                  | `0`                                                            | Checkout depth                                   |
-| `ref`                          | `${{ github.ref }}`                                            | Ref to checkout                                  |
-| `node-version-file`            | `.nvmrc`                                                       | Path to `.nvmrc` (ignored if `node-version` set) |
-| `node-version`                 |                                                                | Explicit Node version                            |
-| `pnpm-version`                 | `9.0.6`                                                        | pnpm version                                     |
-| `cache`                        | `pnpm`                                                         | setup-node cache strategy                        |
-| `npm-registry`                 | `https://registry.npmjs.org`                                   | Registry URL                                     |
-| `npm-token`                    |                                                                | NPM token for authentication (optional)          |
-| `install-command`              | `pnpm install --frozen-lockfile`                               | Install                                          |
-| `build-command`                | `pnpm build`                                                   | Build                                            |
-| `version-command`              | `pnpm run bump`                                                | Changesets version command                       |
-| `publish-command`              | `pnpm run release`                                             | Publish command                                  |
-| `use-changesets`               | `true`                                                         | Toggle changesets/action                         |
-| `changesets-title`             | `Release v\${{ env.NEW_VERSION }}`                             | Title for release PR                             |
-| `changesets-commit`            | `Release v\${{ env.NEW_VERSION }}`                             | Commit message                                   |
-| `changesets-base-branch`       | `main`                                                         | Base branch for changesets version comparison    |
-| `open-pr-to-base`              | `true`                                                         | Open PR back to base after publish               |
-| `pr-base`                      | `main`                                                         | Target branch for back-merge PR                  |
-| `pr-title`                     | `Merge \${{ github.ref_name }} back to \${{ inputs.pr-base }}` | Back-merge PR title                              |
-| `pr-body`                      | `Auto-generated after publishing.`                             | Back-merge PR body                               |
-| `working-directory`            |                                                                | Directory to run commands in                     |
-| `continue-on-empty-changesets` | `true`                                                         | Skip version capture when no changesets          |
+| Name                           | Default                            | Description                                                |
+| ------------------------------ | ---------------------------------- | ---------------------------------------------------------- |
+| `fetch-depth`                  | `0`                                | Checkout depth                                             |
+| `ref`                          | `${{ github.ref }}`                | Ref to checkout                                            |
+| `node-version-file`            | `.nvmrc`                           | Path to `.nvmrc` (ignored if `node-version` set)           |
+| `node-version`                 |                                    | Explicit Node version                                      |
+| `pnpm-version`                 | `9.0.6`                            | pnpm version                                               |
+| `cache`                        | `pnpm`                             | setup-node cache strategy                                  |
+| `npm-registry`                 | `https://registry.npmjs.org`       | Registry URL                                               |
+| `npm-token`                    |                                    | NPM token for authentication (optional)                    |
+| `install-command`              | `pnpm install --frozen-lockfile`   | Install                                                    |
+| `build-command`                | `pnpm build`                       | Build                                                      |
+| `version-command`              | `pnpm run bump`                    | Changesets version command                                 |
+| `publish-command`              | `pnpm run release`                 | Publish command                                            |
+| `use-changesets`               | `true`                             | Toggle changesets/action                                   |
+| `changesets-title`             | `Release`                          | Title for release PR (deprecated, auto-generated)          |
+| `changesets-commit`            | `Release`                          | Commit message (deprecated, auto-generated)                |
+| `changesets-base-branch`       | `main`                             | Base branch for changesets version comparison              |
+| `open-pr-to-base`              | `true`                             | Open PR back to base after publish                         |
+| `pr-base`                      | `main`                             | Target branch for back-merge PR                            |
+| `pr-title`                     |                                    | Override back-merge PR title (uses dynamic title if empty) |
+| `pr-body`                      | `Auto-generated after publishing.` | Back-merge PR body                                         |
+| `auto-merge`                   | `true`                             | Auto squash-merge the back-merge PR                        |
+| `working-directory`            |                                    | Directory to run commands in                               |
+| `continue-on-empty-changesets` | `true`                             | Skip version capture when no changesets                    |
 
 ## Outputs
 
-| Name          | Description                                             |
-| ------------- | ------------------------------------------------------- |
-| `published`   | `"true"` if publish occurred (from `changesets/action`) |
-| `new_version` | Captured version from `changeset status`                |
-| `pr_url`      | URL of created back-merge PR (if any)                   |
+| Name            | Description                                                          |
+| --------------- | -------------------------------------------------------------------- |
+| `published`     | `"true"` if publish occurred (from `changesets/action`)              |
+| `new_version`   | Captured version from `changeset status`                             |
+| `prepare_title` | Title for prepare PR (e.g. `` Prepare release `@scope/pkg@1.0.0` ``) |
+| `release_title` | Title for back-merge PR (e.g. `` Publish `@scope/pkg@1.0.0` ``)      |
+| `release_count` | Number of packages in this release                                   |
+| `pr_url`        | URL of created back-merge PR (if any)                                |
 
 ## Requirements
 

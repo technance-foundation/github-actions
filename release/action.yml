@@ -99,6 +99,10 @@ inputs:
         description: "Body for the back-merge PR"
         default: "Auto-generated after publishing."
         required: false
+    auto-merge:
+        description: "Automatically squash merge the back-merge PR (requires open-pr-to-base: true)"
+        default: "true"
+        required: false
 
     # Misc
     working-directory:
@@ -116,6 +120,15 @@ outputs:
     new_version:
         description: "Captured new version from Changesets status (if any)"
         value: ${{ steps.capture-version.outputs.new_version }}
+    prepare_title:
+        description: "Title for the prepare/version PR (e.g. 'Prepare release `@scope/pkg@1.0.0`')"
+        value: ${{ steps.capture-version.outputs.prepare_title }}
+    release_title:
+        description: "Title for the back-merge PR (e.g. 'Release `@scope/pkg@1.0.0`')"
+        value: ${{ steps.capture-version.outputs.release_title }}
+    release_count:
+        description: "Number of packages in this release"
+        value: ${{ steps.capture-version.outputs.release_count }}
     pr_url:
         description: "URL of the PR opened back to base (if created)"
         value: ${{ steps.open-pr.outputs.pr_url }}
@@ -183,13 +196,37 @@ runs:
               fi
 
               if pnpm changeset status --output=release.json 2>/dev/null; then
+                # Count how many packages are being released
+                RELEASE_COUNT="$(jq -r '.releases | length' release.json)"
+                
+                if [ "$RELEASE_COUNT" -eq 1 ]; then
+                  # Single package
+                  PKG_NAME="$(jq -r '.releases[0].name // empty' release.json)"
+                  PKG_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json)"
+                  PREPARE_TITLE="Prepare release \`${PKG_NAME}@${PKG_VERSION}\`"
+                  RELEASE_TITLE="Publish \`${PKG_NAME}@${PKG_VERSION}\`"
+                elif [ "$RELEASE_COUNT" -gt 1 ]; then
+                  # Multiple packages
+                  PREPARE_TITLE="Prepare new releases"
+                  RELEASE_TITLE="Publish new releases"
+                else
+                  PREPARE_TITLE="Prepare release"
+                  RELEASE_TITLE="Publish"
+                fi
+
                 NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json)"
                 echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
                 echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+                echo "prepare_title=$PREPARE_TITLE" >> "$GITHUB_OUTPUT"
+                echo "release_title=$RELEASE_TITLE" >> "$GITHUB_OUTPUT"
+                echo "release_count=$RELEASE_COUNT" >> "$GITHUB_OUTPUT"
                 rm -f release.json
               else
                 echo "NEW_VERSION=" >> "$GITHUB_ENV"
                 echo "new_version=" >> "$GITHUB_OUTPUT"
+                echo "prepare_title=Prepare release" >> "$GITHUB_OUTPUT"
+                echo "release_title=Publish" >> "$GITHUB_OUTPUT"
+                echo "release_count=0" >> "$GITHUB_OUTPUT"
               fi
 
         - name: Create Release PR or Publish (Changesets)
@@ -197,8 +234,8 @@ runs:
           if: ${{ inputs.use-changesets == 'true' }}
           uses: changesets/action@v1
           with:
-              title: "Release v${{ steps.capture-version.outputs.new_version }}"
-              commit: "Release v${{ steps.capture-version.outputs.new_version }}"
+              title: ${{ steps.capture-version.outputs.prepare_title }}
+              commit: ${{ steps.capture-version.outputs.prepare_title }}
               version: ${{ inputs.version-command }}
               publish: ${{ inputs.publish-command }}
           env:
@@ -206,28 +243,40 @@ runs:
               NPM_TOKEN: ${{ env.NPM_TOKEN }}
               NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
 
-        - name: Open PR → ${{ inputs.pr-base }}
+        - name: Merge release → ${{ inputs.pr-base }}
           id: open-pr
           if: ${{ inputs.open-pr-to-base == 'true' && steps.maybe-changesets.outputs.published == 'true' }}
           shell: bash
           run: |
               set -e
               : "${GH_TOKEN:=${GITHUB_TOKEN}}"
-              : "${GH_TOKEN:?GH_TOKEN/GITHUB_TOKEN required for gh pr create}"
-              # Determine PR title: use input if provided, else compute a sensible default
+              : "${GH_TOKEN:?GH_TOKEN/GITHUB_TOKEN required}"
+
+              # Use pr-title input if provided, otherwise use the dynamic release title
               input_title="${{ inputs.pr-title }}"
               if [ -z "${input_title}" ]; then
-                branch_name="${GITHUB_REF_NAME}"
-                input_title="Merge ${branch_name} back to ${{ inputs.pr-base }}"
+                input_title="${{ steps.capture-version.outputs.release_title }}"
               fi
+              # Final fallback if release_title is also empty
+              if [ -z "${input_title}" ]; then
+                input_title="Publish"
+              fi
+
+              # Create the PR
               pr_url="$(gh pr create \
                 --head "${{ github.ref_name }}" \
                 --base "${{ inputs.pr-base }}" \
                 --title "${input_title}" \
                 --body "${{ inputs.pr-body }}" \
                 --repo "${{ github.repository }}" \
-                --fill --no-maintainer-edit 2>/dev/null || true)"
+                --fill --no-maintainer-edit)"
+
               echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
+
+              # Squash merge and delete branch if auto-merge is enabled
+              if [ "${{ inputs.auto-merge }}" == "true" ]; then
+                gh pr merge "$pr_url" --squash --delete-branch
+              fi
           env:
               GH_TOKEN: ${{ env.GITHUB_TOKEN }}
               GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
