@@ -124,11 +124,11 @@ outputs:
         description: "Title for the prepare/version PR (e.g. 'Prepare release `@scope/pkg@1.0.0`')"
         value: ${{ steps.capture-version.outputs.prepare_title }}
     release_title:
-        description: "Title for the back-merge PR (e.g. 'Release `@scope/pkg@1.0.0`')"
-        value: ${{ steps.capture-version.outputs.release_title }}
+        description: "Title for the back-merge PR (e.g. 'Publish `@scope/pkg@1.0.0`')"
+        value: ${{ steps.release-title.outputs.release_title }}
     release_count:
         description: "Number of packages in this release"
-        value: ${{ steps.capture-version.outputs.release_count }}
+        value: ${{ steps.release-title.outputs.package_count }}
     pr_url:
         description: "URL of the PR opened back to base (if created)"
         value: ${{ steps.open-pr.outputs.pr_url }}
@@ -200,33 +200,26 @@ runs:
                 RELEASE_COUNT="$(jq -r '.releases | length' release.json)"
                 
                 if [ "$RELEASE_COUNT" -eq 1 ]; then
-                  # Single package
+                  # Single package: "Prepare release `@scope/pkg@version`"
                   PKG_NAME="$(jq -r '.releases[0].name // empty' release.json)"
                   PKG_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json)"
                   PREPARE_TITLE="Prepare release \`${PKG_NAME}@${PKG_VERSION}\`"
-                  RELEASE_TITLE="Publish \`${PKG_NAME}@${PKG_VERSION}\`"
                 elif [ "$RELEASE_COUNT" -gt 1 ]; then
                   # Multiple packages
                   PREPARE_TITLE="Prepare new releases"
-                  RELEASE_TITLE="Publish new releases"
                 else
                   PREPARE_TITLE="Prepare release"
-                  RELEASE_TITLE="Publish"
                 fi
 
                 NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json)"
                 echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
                 echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
                 echo "prepare_title=$PREPARE_TITLE" >> "$GITHUB_OUTPUT"
-                echo "release_title=$RELEASE_TITLE" >> "$GITHUB_OUTPUT"
-                echo "release_count=$RELEASE_COUNT" >> "$GITHUB_OUTPUT"
                 rm -f release.json
               else
                 echo "NEW_VERSION=" >> "$GITHUB_ENV"
                 echo "new_version=" >> "$GITHUB_OUTPUT"
                 echo "prepare_title=Prepare release" >> "$GITHUB_OUTPUT"
-                echo "release_title=Publish" >> "$GITHUB_OUTPUT"
-                echo "release_count=0" >> "$GITHUB_OUTPUT"
               fi
 
         - name: Create Release PR or Publish (Changesets)
@@ -243,6 +236,32 @@ runs:
               NPM_TOKEN: ${{ env.NPM_TOKEN }}
               NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
 
+        - name: Generate release title from published packages
+          id: release-title
+          if: ${{ steps.maybe-changesets.outputs.published == 'true' }}
+          shell: bash
+          run: |
+              set -e
+              PUBLISHED='${{ steps.maybe-changesets.outputs.publishedPackages }}'
+
+              # Count published packages
+              PKG_COUNT="$(echo "$PUBLISHED" | jq -r 'length')"
+
+              if [ "$PKG_COUNT" -eq 1 ]; then
+                # Single package: "Publish `@scope/pkg@version`"
+                PKG_NAME="$(echo "$PUBLISHED" | jq -r '.[0].name')"
+                PKG_VERSION="$(echo "$PUBLISHED" | jq -r '.[0].version')"
+                RELEASE_TITLE="Publish \`${PKG_NAME}@${PKG_VERSION}\`"
+              elif [ "$PKG_COUNT" -gt 1 ]; then
+                # Multiple packages
+                RELEASE_TITLE="Publish new releases"
+              else
+                RELEASE_TITLE="Publish"
+              fi
+
+              echo "release_title=$RELEASE_TITLE" >> "$GITHUB_OUTPUT"
+              echo "package_count=$PKG_COUNT" >> "$GITHUB_OUTPUT"
+
         - name: Merge release → ${{ inputs.pr-base }}
           id: open-pr
           if: ${{ inputs.open-pr-to-base == 'true' && steps.maybe-changesets.outputs.published == 'true' }}
@@ -252,12 +271,12 @@ runs:
               : "${GH_TOKEN:=${GITHUB_TOKEN}}"
               : "${GH_TOKEN:?GH_TOKEN/GITHUB_TOKEN required}"
 
-              # Use pr-title input if provided, otherwise use the dynamic release title
+              # Use pr-title input if provided, otherwise use the release title from published packages
               input_title="${{ inputs.pr-title }}"
               if [ -z "${input_title}" ]; then
-                input_title="${{ steps.capture-version.outputs.release_title }}"
+                input_title="${{ steps.release-title.outputs.release_title }}"
               fi
-              # Final fallback if release_title is also empty
+              # Final fallback
               if [ -z "${input_title}" ]; then
                 input_title="Publish"
               fi
