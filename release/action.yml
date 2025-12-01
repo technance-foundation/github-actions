@@ -273,9 +273,9 @@ runs:
 
               echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
 
-              # Squash merge and delete branch if auto-merge is enabled
+              # Enable auto-merge with squash (merges once branch protection requirements are met)
               if [ "${{ inputs.auto-merge }}" == "true" ]; then
-                gh pr merge "$pr_url" --squash --delete-branch
+                gh pr merge "$pr_url" --squash --auto --delete-branch
               fi
           env:
               GH_TOKEN: ${{ env.GITHUB_TOKEN }}
