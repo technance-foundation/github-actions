@@ -92,39 +92,41 @@ ghi9012 Publish `@myorg/core@3.0.0`
 
 After a successful publish, the action can automatically merge the release branch back to your base branch:
 
-| Configuration                                | Behavior                                        |
-| -------------------------------------------- | ----------------------------------------------- |
-| `open-pr-to-base: true`, `auto-merge: true`  | Creates PR and immediately squash-merges it     |
-| `open-pr-to-base: true`, `auto-merge: false` | Creates PR but leaves it open for manual review |
-| `open-pr-to-base: false`                     | No back-merge PR created                        |
+| Configuration                                | Behavior                                                        |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| `open-pr-to-base: true`, `auto-merge: true`  | Creates PR and immediately squash-merges using admin privileges |
+| `open-pr-to-base: true`, `auto-merge: false` | Creates PR but leaves it open for manual review                 |
+| `open-pr-to-base: false`                     | No back-merge PR created                                        |
+
+> **Note:** When `auto-merge: true`, the action uses `gh pr merge --admin` which bypasses branch protection rules. This requires the `GITHUB_TOKEN` to have admin access to the repository.
 
 ## Inputs
 
-| Name                           | Default                            | Description                                                |
-| ------------------------------ | ---------------------------------- | ---------------------------------------------------------- |
-| `fetch-depth`                  | `0`                                | Checkout depth                                             |
-| `ref`                          | `${{ github.ref }}`                | Ref to checkout                                            |
-| `node-version-file`            | `.nvmrc`                           | Path to `.nvmrc` (ignored if `node-version` set)           |
-| `node-version`                 |                                    | Explicit Node version                                      |
-| `pnpm-version`                 | `9.0.6`                            | pnpm version                                               |
-| `cache`                        | `pnpm`                             | setup-node cache strategy                                  |
-| `npm-registry`                 | `https://registry.npmjs.org`       | Registry URL                                               |
-| `npm-token`                    |                                    | NPM token for authentication (optional)                    |
-| `install-command`              | `pnpm install --frozen-lockfile`   | Install                                                    |
-| `build-command`                | `pnpm build`                       | Build                                                      |
-| `version-command`              | `pnpm run bump`                    | Changesets version command                                 |
-| `publish-command`              | `pnpm run release`                 | Publish command                                            |
-| `use-changesets`               | `true`                             | Toggle changesets/action                                   |
-| `changesets-title`             | `Release`                          | Title for release PR (deprecated, auto-generated)          |
-| `changesets-commit`            | `Release`                          | Commit message (deprecated, auto-generated)                |
-| `changesets-base-branch`       | `main`                             | Base branch for changesets version comparison              |
-| `open-pr-to-base`              | `true`                             | Open PR back to base after publish                         |
-| `pr-base`                      | `main`                             | Target branch for back-merge PR                            |
-| `pr-title`                     |                                    | Override back-merge PR title (uses dynamic title if empty) |
-| `pr-body`                      | `Auto-generated after publishing.` | Back-merge PR body                                         |
-| `auto-merge`                   | `true`                             | Auto squash-merge the back-merge PR                        |
-| `working-directory`            |                                    | Directory to run commands in                               |
-| `continue-on-empty-changesets` | `true`                             | Skip version capture when no changesets                    |
+| Name                           | Default                            | Description                                                 |
+| ------------------------------ | ---------------------------------- | ----------------------------------------------------------- |
+| `fetch-depth`                  | `0`                                | Checkout depth                                              |
+| `ref`                          | `${{ github.ref }}`                | Ref to checkout                                             |
+| `node-version-file`            | `.nvmrc`                           | Path to `.nvmrc` (ignored if `node-version` set)            |
+| `node-version`                 |                                    | Explicit Node version                                       |
+| `pnpm-version`                 | `9.0.6`                            | pnpm version                                                |
+| `cache`                        | `pnpm`                             | setup-node cache strategy                                   |
+| `npm-registry`                 | `https://registry.npmjs.org`       | Registry URL                                                |
+| `npm-token`                    |                                    | NPM token for authentication (optional)                     |
+| `install-command`              | `pnpm install --frozen-lockfile`   | Install                                                     |
+| `build-command`                | `pnpm build`                       | Build                                                       |
+| `version-command`              | `pnpm run bump`                    | Changesets version command                                  |
+| `publish-command`              | `pnpm run release`                 | Publish command                                             |
+| `use-changesets`               | `true`                             | Toggle changesets/action                                    |
+| `changesets-title`             | `Release`                          | Title for release PR (deprecated, auto-generated)           |
+| `changesets-commit`            | `Release`                          | Commit message (deprecated, auto-generated)                 |
+| `changesets-base-branch`       | `main`                             | Base branch for changesets version comparison               |
+| `open-pr-to-base`              | `true`                             | Open PR back to base after publish                          |
+| `pr-base`                      | `main`                             | Target branch for back-merge PR                             |
+| `pr-title`                     |                                    | Override back-merge PR title (uses dynamic title if empty)  |
+| `pr-body`                      | `Auto-generated after publishing.` | Back-merge PR body                                          |
+| `auto-merge`                   | `true`                             | Auto squash-merge the back-merge PR (requires admin access) |
+| `working-directory`            |                                    | Directory to run commands in                                |
+| `continue-on-empty-changesets` | `true`                             | Skip version capture when no changesets                     |
 
 ## Outputs
 
@@ -141,8 +143,9 @@ After a successful publish, the action can automatically merge the release branc
 
 -   Workflow must grant permissions: `contents: write`, `pull-requests: write`, `id-token: write`.
 -   `npm-token` input is optional - only needed for private registry authentication.
+-   **Admin access required** if using `auto-merge: true` (the default). The `GITHUB_TOKEN` must have admin privileges to bypass branch protection rules. Alternatively, set `auto-merge: false` to create the PR without auto-merging.
 -   Env/Secrets expected:
 
-    -   `GITHUB_TOKEN` (provided by GitHub)
+    -   `GITHUB_TOKEN` (provided by GitHub, needs admin access for auto-merge)
     -   `NPM_TOKEN` (for install auth)
     -   `NPM_PUBLISH_TOKEN` (for publish auth)

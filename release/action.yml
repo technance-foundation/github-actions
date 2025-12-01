@@ -100,7 +100,7 @@ inputs:
         default: "Auto-generated after publishing."
         required: false
     auto-merge:
-        description: "Automatically squash merge the back-merge PR (requires open-pr-to-base: true)"
+        description: "Automatically squash merge the back-merge PR using admin privileges (requires open-pr-to-base: true and admin access)"
         default: "true"
         required: false
 
@@ -292,9 +292,9 @@ runs:
 
               echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
 
-              # Enable auto-merge with squash (merges once branch protection requirements are met)
+              # Squash merge immediately using admin privileges (bypasses branch protection)
               if [ "${{ inputs.auto-merge }}" == "true" ]; then
-                gh pr merge "$pr_url" --squash --auto --delete-branch
+                gh pr merge "$pr_url" --squash --admin --delete-branch
               fi
           env:
               GH_TOKEN: ${{ env.GITHUB_TOKEN }}
