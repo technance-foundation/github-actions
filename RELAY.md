@@ -8,6 +8,22 @@ The Relay is a small service that listens to GitHub events, watches for preview 
 
 ---
 
+## Relay Implementation
+
+The Relay itself is implemented as a lightweight Node.js service that runs as a GitHub App.
+
+🔗 Source code:  
+https://github.com/technance-foundation/vercel-to-github-relay
+
+This is the service responsible for:
+
+-   Listening to GitHub App webhooks
+-   Detecting preview deployments
+-   Triggering `workflow_dispatch` for E2E runs
+-   Managing check runs
+
+---
+
 ## Why the Relay exists
 
 When someone opens a pull request, we want to show an “E2E Tests” check immediately. But tests can’t run until:

@@ -28,6 +28,11 @@ This repository contains reusable **composite GitHub Actions** maintained by Tec
     Full Playwright E2E test pipeline: installs deps, caches browsers, runs tests, uploads reports, and updates GitHub Check Runs. Replaces long multi-step workflows with one action.
 
 > [!NOTE]
-> Our Playwright E2E system also uses a small service called the **Relay**.  
-> It waits for preview deployments to become ready and then triggers the E2E workflow at the right moment.  
-> You can read more about it here: [RELAY.md](./RELAY.md)
+> Our Playwright E2E system uses a small external service called the **Relay**.  
+> It waits for preview deployments to become ready and then triggers the E2E workflow.
+>
+> 🛰 **Relay implementation:**  
+> https://github.com/technance-foundation/vercel-to-github-relay
+>
+> 📘 **Relay overview:**  
+> See [RELAY.md](./RELAY.md) for a full explanation of how it works.

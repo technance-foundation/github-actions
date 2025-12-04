@@ -11,7 +11,7 @@ This action wraps the logic from our relay-driven E2E system and allows any work
 
 ### Where this is used
 
-Most of the time, this action is called by our **E2E Relay**, which creates the check runs and updates them as the workflow progresses.  
+Most of the time, this action is called by our [**E2E Relay**](../RELAY.md), which creates the check runs and updates them as the workflow progresses.  
 If you want to understand the bigger picture of how checks are created and triggered, take a look at: [RELAY.md](../RELAY.md)
 
 ---
