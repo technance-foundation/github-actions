@@ -40,7 +40,9 @@ runs:
           id: pnpm-cache
           shell: bash
           run: |
-              echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+              echo "STORE_PATH<<EOF" >> "$GITHUB_OUTPUT"
+              pnpm store path >> "$GITHUB_OUTPUT"
+              echo "EOF" >> "$GITHUB_OUTPUT"
 
         - uses: actions/cache/restore@v4
           if: ${{ inputs.pnpm-cache == 'read' }}
