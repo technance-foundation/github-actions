@@ -211,20 +211,21 @@ runs:
 
               CURRENT_BRANCH="${GITHUB_REF_NAME:-main}"
 
-              echo "Rebasing on latest origin/${CURRENT_BRANCH} before push"
-              git fetch origin "${CURRENT_BRANCH}"
-              git rebase "origin/${CURRENT_BRANCH}"
-
-              # Ensure no GITHUB_TOKEN extraheader is overriding our PAT
+              # Ensure no GITHUB_TOKEN extraheader is overriding our PAT (defensive)
               git config --local --unset-all http.https://github.com/.extraheader || true
 
+              # Configure remote with PAT *before* any fetch/rebase/push
               if [ -n "$PUSH_TOKEN" ]; then
                 echo "Configuring authenticated remote with provided push-token"
                 git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
               else
-                echo "WARNING: no push-token provided, falling back to GITHUB_TOKEN."
+                echo "WARNING: no push-token provided, falling back to unauthenticated remote."
                 echo "If the branch is protected and requires a bypass actor, this push may be rejected."
               fi
+
+              echo "Rebasing on latest origin/${CURRENT_BRANCH} before push"
+              git fetch origin "${CURRENT_BRANCH}"
+              git rebase "origin/${CURRENT_BRANCH}"
 
               echo "Pushing to origin ${CURRENT_BRANCH}"
               set +e
