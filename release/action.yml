@@ -221,7 +221,17 @@ runs:
               fi
 
               echo "Pushing to origin ${CURRENT_BRANCH}"
+              set +e
               git push origin "HEAD:${CURRENT_BRANCH}"
+              PUSH_EXIT=$?
+              set -e
+
+              if [ "$PUSH_EXIT" -ne 0 ]; then
+                echo "Initial push failed (exit code $PUSH_EXIT), attempting force push with lease..."
+                git push --force-with-lease origin "HEAD:${CURRENT_BRANCH}"
+              else
+                echo "Push succeeded."
+              fi
 
         - name: Publish packages
           if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
