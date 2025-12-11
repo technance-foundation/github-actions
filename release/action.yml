@@ -188,10 +188,8 @@ runs:
                 echo "has_changes=true" >> "$GITHUB_OUTPUT"
               fi
 
-        - name: Commit and push version bumps
-          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
+        - name: Commit & push version bump
           shell: bash
-          working-directory: ${{ inputs.working-directory }}
           env:
               GITHUB_REF_NAME: ${{ github.ref_name }}
           run: |
@@ -203,8 +201,12 @@ runs:
               git add .
               git commit -m "$COMMIT_MESSAGE"
 
-              # Push back to main (or current ref)
               CURRENT_BRANCH="${GITHUB_REF_NAME:-main}"
+
+              echo "Rebasing on latest origin/${CURRENT_BRANCH} before push"
+              git fetch origin "${CURRENT_BRANCH}"
+              git rebase "origin/${CURRENT_BRANCH}"
+
               echo "Pushing to origin ${CURRENT_BRANCH}"
               git push origin "HEAD:${CURRENT_BRANCH}"
 
