@@ -34,7 +34,7 @@ If you want to understand the bigger picture of how checks are created and trigg
 ### Mark check as in_progress
 
 ```yaml
-- uses: technance-foundation/github-actions/e2e-check@main
+- uses: technance-foundation/github-actions/e2e-check@v1
   with:
       token: ${{ steps.app-token.outputs.token }}
       check-run-id: ${{ inputs.check_run_id }}
@@ -44,7 +44,7 @@ If you want to understand the bigger picture of how checks are created and trigg
 ### Mark check as completed
 
 ```yaml
-- uses: technance-foundation/github-actions/e2e-check@main
+- uses: technance-foundation/github-actions/e2e-check@v1
   if: always()
   with:
       token: ${{ steps.app-token.outputs.token }}

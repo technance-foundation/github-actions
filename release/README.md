@@ -38,7 +38,7 @@ jobs:
         timeout-minutes: 15
         steps:
             - name: Release
-              uses: technance-foundation/github-actions/release@main
+              uses: technance-foundation/github-actions/release@v1
 ```
 
 ## With NPM Authentication
@@ -47,7 +47,7 @@ If you need to authenticate with a private NPM registry:
 
 ```yaml
 - name: Release
-  uses: technance-foundation/github-actions/release@main
+  uses: technance-foundation/github-actions/release@v1
   with:
       npm-token: ${{ secrets.NPM_TOKEN }}
 ```
@@ -59,7 +59,7 @@ Override Node version, working dir, custom commands, and PR behavior:
 ```yaml
 steps:
     - name: Release
-      uses: technance-foundation/github-actions/release@main
+      uses: technance-foundation/github-actions/release@v1
       with:
           node-version: "20"
           pnpm-version: "9.0.6"

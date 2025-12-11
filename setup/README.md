@@ -5,12 +5,12 @@ It handles environment setup, dependency installation, caching, and optional bui
 
 ## Features
 
-- Sets up Node.js and pnpm for the workflow
-- Restores and saves the pnpm store cache for faster installs
-- Authenticates to the NPM registry (for private packages)
-- Installs dependencies (optional)
-- Builds the project (optional)
-- Allows overriding install/build commands or skipping them entirely
+-   Sets up Node.js and pnpm for the workflow
+-   Restores and saves the pnpm store cache for faster installs
+-   Authenticates to the NPM registry (for private packages)
+-   Installs dependencies (optional)
+-   Builds the project (optional)
+-   Allows overriding install/build commands or skipping them entirely
 
 ## Inputs
 
@@ -35,14 +35,14 @@ name: "Setup"
 on: push
 
 jobs:
-  setup:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: technance-foundation/github-actions/setup@main
-        with:
-          node-version: "20"
-          pnpm-version: "10.6.5"
-          npm-token: ${{ secrets.NPM_TOKEN }}
+    setup:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: technance-foundation/github-actions/setup@v1
+              with:
+                  node-version: "20"
+                  pnpm-version: "10.6.5"
+                  npm-token: ${{ secrets.NPM_TOKEN }}
 ```
 
 ### Skipping Install or Build
@@ -50,7 +50,7 @@ jobs:
 If you want to skip install or build:
 
 ```yaml
-- uses: technance-foundation/github-actions/setup@main
+- uses: technance-foundation/github-actions/setup@v1
   with:
   npm-token: ${{ secrets.NPM_TOKEN }}
   install: "false"
@@ -62,7 +62,7 @@ If you want to skip install or build:
 You can override the defaults:
 
 ```yaml
-- uses: technance-foundation/github-actions/setup@main
+- uses: technance-foundation/github-actions/setup@v1
   with:
   npm-token: ${{ secrets.NPM_TOKEN }}
   install: "pnpm install --frozen-lockfile"
