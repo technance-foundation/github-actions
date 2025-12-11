@@ -189,6 +189,7 @@ runs:
               fi
 
         - name: Commit & push version bump
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
           shell: bash
           env:
               GITHUB_REF_NAME: ${{ github.ref_name }}
