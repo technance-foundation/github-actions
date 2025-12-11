@@ -168,7 +168,6 @@ runs:
                   NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json || echo '')"
                   echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
                 fi
-                rm -f release.json
               else
                 echo "changeset status failed or no pending releases; skipping."
                 echo "has_changesets=false" >> "$GITHUB_OUTPUT"
@@ -213,10 +212,10 @@ runs:
 
               STYLE="${COMMIT_STYLE:-normal}"
 
-              # Try to regenerate release.json
-              if pnpm changeset status --output=release.json >/dev/null 2>&1; then
+              if [ -f "release.json" ]; then
                 RELEASE_COUNT="$(jq -r '.releases | length' release.json || echo 0)"
               else
+                echo "release.json not found; falling back to generic commit message."
                 RELEASE_COUNT=0
               fi
 
@@ -255,7 +254,6 @@ runs:
                 done < <(jq -c '.releases[]' release.json)
               fi
 
-              # Emit as multi-line output
               {
                 echo "message<<EOF"
                 printf '%b' "$MESSAGE"
