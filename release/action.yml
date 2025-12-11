@@ -1,30 +1,18 @@
-name: Release (Changesets + pnpm)
+name: Release (Changesets + pnpm, auto on main)
 description: >
-    Reusable composite action to build and release packages using pnpm and Changesets.
-    Handles checkout, Node/pnpm setup, install, build, version capture, publish, and optional PR back to main.
+    Fully automated release action that runs on pushes to main.
+    Uses Changesets to bump versions, remove .changeset files, commit & push,
+    and publish packages with pnpm.
 
 branding:
     icon: package
     color: blue
 
 inputs:
-    # Git / Branch / Checkout
-    fetch-depth:
-        description: "Checkout fetch depth"
-        default: "0"
-        required: false
-    ref:
-        description: "Ref to checkout"
-        default: "${{ github.ref }}"
-        required: false
-
     # Node / pnpm
-    node-version-file:
-        description: "Path to .nvmrc; ignored if node-version is provided"
-        default: ".nvmrc"
-        required: false
     node-version:
-        description: "Explicit Node.js version (overrides node-version-file)"
+        description: "Explicit Node.js version"
+        default: "20"
         required: false
     pnpm-version:
         description: "pnpm version to install"
@@ -41,8 +29,19 @@ inputs:
         default: "https://registry.npmjs.org"
         required: false
     npm-token:
-        description: "NPM token for authentication (optional)"
+        description: "NPM token for authentication (optional, required for publishing)"
         required: false
+
+    # Token used for pushing release commits
+    push-token:
+        description: >
+            Token used to push release commits.
+            Can be:
+            - a user/bot PAT with repo write access, or
+            - a GitHub App installation access token.
+            If omitted, falls back to GITHUB_TOKEN (may be blocked by branch protection).
+        required: false
+        default: ""
 
     # Commands
     install-command:
@@ -54,100 +53,60 @@ inputs:
         default: "pnpm build"
         required: false
     version-command:
-        description: "Changesets version command"
+        description: "Changesets version command (bump versions and remove .changeset files)"
         default: "pnpm run bump"
         required: false
     publish-command:
-        description: "Publish command"
+        description: "Publish command (usually pnpm run release or pnpm changeset publish)"
         default: "pnpm run release"
         required: false
 
-    # Changesets behavior
-    use-changesets:
-        description: "Use changesets/action@v1 for versioning & publish"
-        default: "true"
-        required: false
-    changesets-title:
-        description: "Release PR title"
-        default: "Release"
-        required: false
-    changesets-commit:
-        description: "Release PR commit message"
-        default: "Release"
-        required: false
-
-    # Changesets base branch
-    changesets-base-branch:
-        description: "Base branch for changesets to fetch and compare against (usually main/master)"
-        default: "main"
-        required: false
-
-    # PR back to base branch after publish
-    open-pr-to-base:
-        description: "Open a PR from release branch back to base after a successful publish"
-        default: "true"
-        required: false
-    pr-base:
-        description: "Target branch to merge the release branch into (e.g. main for production releases, next for pre-releases)"
-        default: "main"
-        required: false
-    pr-title:
-        description: "Title for the back-merge PR"
-        default: ""
-        required: false
-    pr-body:
-        description: "Body for the back-merge PR"
-        default: "Auto-generated after publishing."
-        required: false
-    auto-merge:
-        description: "Automatically squash merge the back-merge PR using admin privileges (requires open-pr-to-base: true and admin access)"
-        default: "true"
-        required: false
-
-    # Misc
+    # Misc / Git
     working-directory:
         description: "Working directory to run all commands in"
         required: false
-    continue-on-empty-changesets:
-        description: "Skip version capture gracefully when no changesets exist"
-        default: "true"
+    git-user-name:
+        description: "Git user.name for release commit"
+        default: "github-actions[bot]"
+        required: false
+    git-user-email:
+        description: "Git user.email for release commit"
+        default: "github-actions[bot]@users.noreply.github.com"
+        required: false
+    commit-style:
+        description: "Commit message style: normal|conventional"
+        default: "normal"
+        required: false
+    commit-message:
+        description: "Override commit message completely. If set, commit-style and auto generation are ignored."
+        default: ""
         required: false
 
 outputs:
     published:
-        description: "Whether a publish occurred (from changesets/action)"
-        value: ${{ steps.maybe-changesets.outputs.published }}
+        description: "Whether a publish occurred"
+        value: ${{ steps.set-output.outputs.published }}
     new_version:
-        description: "Captured new version from Changesets status (if any)"
-        value: ${{ steps.capture-version.outputs.new_version }}
-    prepare_title:
-        description: "Title for the prepare/version PR (e.g. 'Prepare release `@scope/pkg@1.0.0`')"
-        value: ${{ steps.capture-version.outputs.prepare_title }}
-    release_title:
-        description: "Title for the back-merge PR (e.g. 'Publish `@scope/pkg@1.0.0`')"
-        value: ${{ steps.release-title.outputs.release_title }}
-    release_count:
-        description: "Number of packages in this release"
-        value: ${{ steps.release-title.outputs.package_count }}
-    pr_url:
-        description: "URL of the PR opened back to base (if created)"
-        value: ${{ steps.open-pr.outputs.pr_url }}
+        description: "Captured example new version from Changesets status (best effort)"
+        value: ${{ steps.set-output.outputs.new_version }}
 
 runs:
-    using: "composite"
+    using: composite
     steps:
         - name: Checkout
           uses: actions/checkout@v4
           with:
-              fetch-depth: ${{ inputs.fetch-depth }}
-              ref: ${{ inputs.ref }}
+              fetch-depth: 0
+              # Use push-token if provided, otherwise fall back to GITHUB_TOKEN
+              token: ${{ inputs.push-token != '' && inputs.push-token || github.token }}
+              # Only persist credentials when we are *not* using a custom push-token
+              persist-credentials: ${{ inputs.push-token == '' }}
 
-        - name: Setup git for Changesets
+        - name: Setup git
           shell: bash
           run: |
-              git config --global user.email "github-actions[bot]@users.noreply.github.com"
-              git config --global user.name "github-actions[bot]"
-              git fetch origin ${{ inputs.changesets-base-branch }}:${{ inputs.changesets-base-branch }}
+              git config --global user.email "${{ inputs.git-user-email }}"
+              git config --global user.name "${{ inputs.git-user-name }}"
 
         - name: Setup pnpm
           uses: pnpm/action-setup@v4
@@ -159,7 +118,6 @@ runs:
           uses: actions/setup-node@v4
           with:
               node-version: ${{ inputs.node-version }}
-              node-version-file: ${{ inputs.node-version == '' && inputs.node-version-file || '' }}
               registry-url: ${{ inputs.npm-registry }}
               cache: ${{ inputs.cache }}
               cache-dependency-path: |
@@ -168,7 +126,6 @@ runs:
         - name: Authenticate NPM registry (optional)
           if: ${{ inputs.npm-token != '' }}
           shell: bash
-          working-directory: ${{ inputs.working-directory }}
           env:
               NPM_TOKEN: ${{ inputs.npm-token }}
           run: |
@@ -184,118 +141,199 @@ runs:
           working-directory: ${{ inputs.working-directory }}
           run: ${{ inputs.build-command }}
 
-        - name: Capture New Release Version
-          id: capture-version
-          if: ${{ inputs.use-changesets == 'true' && ( inputs.continue-on-empty-changesets == 'true' || hashFiles('.changeset/*.md') != '' ) }}
+        # Detect pending changesets
+        - name: Check for pending changesets
+          id: changeset-status
           shell: bash
           working-directory: ${{ inputs.working-directory }}
           run: |
               set -e
-              if ! command -v jq >/dev/null 2>&1; then
-                sudo apt-get update -y && sudo apt-get install -y jq
+
+              if [ ! -d ".changeset" ]; then
+                echo "has_changesets=false" >> "$GITHUB_OUTPUT"
+                echo "No .changeset directory found; skipping release."
+                exit 0
               fi
 
+              # Try to get JSON status; if it fails, assume no changesets.
               if pnpm changeset status --output=release.json 2>/dev/null; then
-                # Count how many packages are being released
-                RELEASE_COUNT="$(jq -r '.releases | length' release.json)"
-                
-                if [ "$RELEASE_COUNT" -eq 1 ]; then
-                  # Single package: "Prepare release `@scope/pkg@version`"
-                  PKG_NAME="$(jq -r '.releases[0].name // empty' release.json)"
-                  PKG_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json)"
-                  PREPARE_TITLE="Prepare release \`${PKG_NAME}@${PKG_VERSION}\`"
-                elif [ "$RELEASE_COUNT" -gt 1 ]; then
-                  # Multiple packages
-                  PREPARE_TITLE="Prepare new releases"
+                RELEASE_COUNT="$(jq -r '.releases | length' release.json || echo 0)"
+                if [ "$RELEASE_COUNT" -eq 0 ]; then
+                  echo "No pending changesets; skipping release."
+                  echo "has_changesets=false" >> "$GITHUB_OUTPUT"
                 else
-                  PREPARE_TITLE="Prepare release"
+                  echo "Found $RELEASE_COUNT pending releases."
+                  echo "has_changesets=true" >> "$GITHUB_OUTPUT"
+                  # Best-effort example new version
+                  NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json || echo '')"
+                  echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+                fi
+              else
+                echo "changeset status failed or no pending releases; skipping."
+                echo "has_changesets=false" >> "$GITHUB_OUTPUT"
+              fi
+
+        # Run versioning (bump versions, update changelogs, remove .changeset/*.md)
+        - name: Apply version bumps with Changesets
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: |
+              set -e
+              echo "Running version command: ${{ inputs.version-command }}"
+              ${{ inputs.version-command }}
+
+        # Check if versioning actually changed anything
+        - name: Check for git changes after versioning
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' }}
+          id: git-diff
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: |
+              set -e
+              if [ -z "$(git status --porcelain)" ]; then
+                echo "No git changes after versioning; skipping commit & publish."
+                echo "has_changes=false" >> "$GITHUB_OUTPUT"
+              else
+                echo "Detected git changes after versioning."
+                git status --short
+                echo "has_changes=true" >> "$GITHUB_OUTPUT"
+              fi
+
+        - name: Generate dynamic commit message
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
+          id: commit-message
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              COMMIT_STYLE: ${{ inputs.commit-style }}
+          run: |
+              set -e
+
+              STYLE="${COMMIT_STYLE:-normal}"
+
+              if [ -f "release.json" ]; then
+                RELEASE_COUNT="$(jq -r '.releases | length' release.json || echo 0)"
+              else
+                echo "release.json not found; falling back to generic commit message."
+                RELEASE_COUNT=0
+              fi
+
+              if [ "$RELEASE_COUNT" -eq 0 ]; then
+                # No detectable releases -- fallback
+                if [ "$STYLE" = "conventional" ]; then
+                  MESSAGE="chore: release package(s)"
+                else
+                  MESSAGE="Release package(s)"
                 fi
 
-                NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json)"
-                echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
-                echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-                echo "prepare_title=$PREPARE_TITLE" >> "$GITHUB_OUTPUT"
-                rm -f release.json
+              elif [ "$RELEASE_COUNT" -eq 1 ]; then
+                # Single package
+                NAME="$(jq -r '.releases[0].name' release.json)"
+                VERSION="$(jq -r '.releases[0].newVersion' release.json)"
+
+                if [ "$STYLE" = "conventional" ]; then
+                  MESSAGE="chore: release ${NAME}@${VERSION}"
+                else
+                  MESSAGE="Release \`${NAME}@${VERSION}\`"
+                fi
+
               else
-                echo "NEW_VERSION=" >> "$GITHUB_ENV"
-                echo "new_version=" >> "$GITHUB_OUTPUT"
-                echo "prepare_title=Prepare release" >> "$GITHUB_OUTPUT"
-              fi
-
-        - name: Create Release PR or Publish (Changesets)
-          id: maybe-changesets
-          if: ${{ inputs.use-changesets == 'true' }}
-          uses: changesets/action@v1
-          with:
-              title: ${{ steps.capture-version.outputs.prepare_title }}
-              commit: ${{ steps.capture-version.outputs.prepare_title }}
-              version: ${{ inputs.version-command }}
-              publish: ${{ inputs.publish-command }}
-          env:
-              GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
-              NPM_TOKEN: ${{ env.NPM_TOKEN }}
-              NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
-
-        - name: Generate release title from published packages
-          id: release-title
-          if: ${{ steps.maybe-changesets.outputs.published == 'true' }}
-          shell: bash
-          run: |
-              set -e
-              PUBLISHED='${{ steps.maybe-changesets.outputs.publishedPackages }}'
-
-              # Count published packages
-              PKG_COUNT="$(echo "$PUBLISHED" | jq -r 'length')"
-
-              if [ "$PKG_COUNT" -eq 1 ]; then
-                # Single package: "Publish `@scope/pkg@version`"
-                PKG_NAME="$(echo "$PUBLISHED" | jq -r '.[0].name')"
-                PKG_VERSION="$(echo "$PUBLISHED" | jq -r '.[0].version')"
-                RELEASE_TITLE="Publish \`${PKG_NAME}@${PKG_VERSION}\`"
-              elif [ "$PKG_COUNT" -gt 1 ]; then
                 # Multiple packages
-                RELEASE_TITLE="Publish new releases"
-              else
-                RELEASE_TITLE="Publish"
+                if [ "$STYLE" = "conventional" ]; then
+                  MESSAGE="chore: release packages\n\n"
+                else
+                  MESSAGE="Release packages\n\n"
+                fi
+
+                # Append bullet list
+                while IFS= read -r ROW; do
+                  NAME=$(echo "$ROW" | jq -r '.name')
+                  VERSION=$(echo "$ROW" | jq -r '.newVersion')
+                  MESSAGE="${MESSAGE}- Released \`${NAME}@${VERSION}\`\n"
+                done < <(jq -c '.releases[]' release.json)
               fi
 
-              echo "release_title=$RELEASE_TITLE" >> "$GITHUB_OUTPUT"
-              echo "package_count=$PKG_COUNT" >> "$GITHUB_OUTPUT"
+              {
+                echo "message<<EOF"
+                printf '%b' "$MESSAGE"
+                echo
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
 
-        - name: Merge release → ${{ inputs.pr-base }}
-          id: open-pr
-          if: ${{ inputs.open-pr-to-base == 'true' && steps.maybe-changesets.outputs.published == 'true' }}
+              rm -f release.json || true
+
+        - name: Commit & push version bump
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
           shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              GITHUB_REF_NAME: ${{ github.ref_name }}
+              PUSH_TOKEN: ${{ inputs.push-token }}
+              # If commit-message input is set, use it. Otherwise use the generated one.
+              COMMIT_MESSAGE: ${{ inputs.commit-message != '' && inputs.commit-message || steps.commit-message.outputs.message }}
           run: |
               set -e
-              : "${GH_TOKEN:=${GITHUB_TOKEN}}"
-              : "${GH_TOKEN:?GH_TOKEN/GITHUB_TOKEN required}"
 
-              # Use pr-title input if provided, otherwise use the release title from published packages
-              input_title="${{ inputs.pr-title }}"
-              if [ -z "${input_title}" ]; then
-                input_title="${{ steps.release-title.outputs.release_title }}"
+              echo "Committing with message:"
+              echo "$COMMIT_MESSAGE"
+
+              git add .
+              git commit -m "$COMMIT_MESSAGE"
+
+              CURRENT_BRANCH="${GITHUB_REF_NAME:-main}"
+
+              # Ensure no GITHUB_TOKEN extraheader is overriding our PAT (defensive)
+              git config --local --unset-all http.https://github.com/.extraheader || true
+
+              # Configure remote with PAT *before* any fetch/rebase/push
+              if [ -n "$PUSH_TOKEN" ]; then
+                echo "Configuring authenticated remote with provided push-token"
+                git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+              else
+                echo "WARNING: no push-token provided, falling back to unauthenticated remote."
+                echo "If the branch is protected and requires a bypass actor, this push may be rejected."
               fi
-              # Final fallback
-              if [ -z "${input_title}" ]; then
-                input_title="Publish"
+
+              echo "Rebasing on latest origin/${CURRENT_BRANCH} before push"
+              git fetch origin "${CURRENT_BRANCH}"
+              git rebase "origin/${CURRENT_BRANCH}"
+
+              echo "Pushing to origin ${CURRENT_BRANCH}"
+              set +e
+              git push origin "HEAD:${CURRENT_BRANCH}"
+              PUSH_EXIT=$?
+              set -e
+
+              if [ "$PUSH_EXIT" -ne 0 ]; then
+                echo "Initial push failed (exit code $PUSH_EXIT), attempting force push with lease..."
+                git push --force-with-lease origin "HEAD:${CURRENT_BRANCH}"
+              else
+                echo "Push succeeded."
               fi
 
-              # Create the PR
-              pr_url="$(gh pr create \
-                --head "${{ github.ref_name }}" \
-                --base "${{ inputs.pr-base }}" \
-                --title "${input_title}" \
-                --body "${{ inputs.pr-body }}" \
-                --repo "${{ github.repository }}" \
-                --fill --no-maintainer-edit)"
-
-              echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
-
-              # Squash merge immediately using admin privileges (bypasses branch protection)
-              if [ "${{ inputs.auto-merge }}" == "true" ]; then
-                gh pr merge "$pr_url" --squash --admin --delete-branch
-              fi
+        - name: Publish packages
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
           env:
-              GH_TOKEN: ${{ env.GITHUB_TOKEN }}
-              GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+              NODE_AUTH_TOKEN: ${{ inputs.npm-token }}
+          run: |
+              set -e
+              echo "Running publish command: ${{ inputs.publish-command }}"
+              ${{ inputs.publish-command }}
+
+        - name: Set outputs
+          id: set-output
+          shell: bash
+          run: |
+              PUBLISHED="false"
+              NEW_VERSION="${{ steps.changeset-status.outputs.new_version }}"
+
+              if [ "${{ steps.changeset-status.outputs.has_changesets }}" = "true" ] && \
+                 [ "${{ steps.git-diff.outputs.has_changes }}" = "true" ]; then
+                PUBLISHED="true"
+              fi
+
+              echo "published=$PUBLISHED" >> "$GITHUB_OUTPUT"
+              echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
