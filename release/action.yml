@@ -88,8 +88,11 @@ runs:
         - name: Checkout
           uses: actions/checkout@v4
           with:
-              fetch-depth: 0 # changesets may need full history
-              persist-credentials: true
+              fetch-depth: 0
+              # Use push-token if provided, otherwise fall back to GITHUB_TOKEN
+              token: ${{ inputs.push-token != '' && inputs.push-token || github.token }}
+              # Only persist credentials when we are *not* using a custom push-token
+              persist-credentials: ${{ inputs.push-token == '' }}
 
         - name: Setup git
           shell: bash
@@ -211,6 +214,9 @@ runs:
               echo "Rebasing on latest origin/${CURRENT_BRANCH} before push"
               git fetch origin "${CURRENT_BRANCH}"
               git rebase "origin/${CURRENT_BRANCH}"
+
+              # Ensure no GITHUB_TOKEN extraheader is overriding our PAT
+              git config --local --unset-all http.https://github.com/.extraheader || true
 
               if [ -n "$PUSH_TOKEN" ]; then
                 echo "Configuring authenticated remote with provided push-token"
