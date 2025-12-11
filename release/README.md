@@ -64,7 +64,7 @@ jobs:
 
         steps:
             - name: Run automated release
-              uses: technance-foundation/github-actions/release@v1
+              uses: technance-foundation/github-actions/release@v2
               with:
                   node-version: "20"
                   pnpm-version: "9.0.6"
