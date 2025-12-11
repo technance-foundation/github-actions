@@ -73,6 +73,14 @@ inputs:
         description: "Git user.email for release commit"
         default: "github-actions[bot]@users.noreply.github.com"
         required: false
+    commit-style:
+        description: "Commit message style: normal|conventional"
+        default: "normal"
+        required: false
+    commit-message:
+        description: "Override commit message completely. If set, commit-style and auto generation are ignored."
+        default: ""
+        required: false
 
 outputs:
     published:
@@ -193,6 +201,70 @@ runs:
                 echo "has_changes=true" >> "$GITHUB_OUTPUT"
               fi
 
+        - name: Generate dynamic commit message
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
+          id: commit-message
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              COMMIT_STYLE: ${{ inputs.commit-style }}
+          run: |
+              set -e
+
+              STYLE="${COMMIT_STYLE:-normal}"
+
+              # Try to regenerate release.json
+              if pnpm changeset status --output=release.json >/dev/null 2>&1; then
+                RELEASE_COUNT="$(jq -r '.releases | length' release.json || echo 0)"
+              else
+                RELEASE_COUNT=0
+              fi
+
+              if [ "$RELEASE_COUNT" -eq 0 ]; then
+                # No detectable releases -- fallback
+                if [ "$STYLE" = "conventional" ]; then
+                  MESSAGE="chore: release package(s)"
+                else
+                  MESSAGE="Release package(s)"
+                fi
+
+              elif [ "$RELEASE_COUNT" -eq 1 ]; then
+                # Single package
+                NAME="$(jq -r '.releases[0].name' release.json)"
+                VERSION="$(jq -r '.releases[0].newVersion' release.json)"
+
+                if [ "$STYLE" = "conventional" ]; then
+                  MESSAGE="chore: release ${NAME}@${VERSION}"
+                else
+                  MESSAGE="Release \`${NAME}@${VERSION}\`"
+                fi
+
+              else
+                # Multiple packages
+                if [ "$STYLE" = "conventional" ]; then
+                  MESSAGE="chore: release packages\n\n"
+                else
+                  MESSAGE="Release packages\n\n"
+                fi
+
+                # Append bullet list
+                while IFS= read -r ROW; do
+                  NAME=$(echo "$ROW" | jq -r '.name')
+                  VERSION=$(echo "$ROW" | jq -r '.newVersion')
+                  MESSAGE="${MESSAGE}- Released \`${NAME}@${VERSION}\`\n"
+                done < <(jq -c '.releases[]' release.json)
+              fi
+
+              # Emit as multi-line output
+              {
+                echo "message<<EOF"
+                printf '%b' "$MESSAGE"
+                echo
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+
+              rm -f release.json || true
+
         - name: Commit & push version bump
           if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
           shell: bash
@@ -200,11 +272,13 @@ runs:
           env:
               GITHUB_REF_NAME: ${{ github.ref_name }}
               PUSH_TOKEN: ${{ inputs.push-token }}
+              # If commit-message input is set, use it. Otherwise use the generated one.
+              COMMIT_MESSAGE: ${{ inputs.commit-message != '' && inputs.commit-message || steps.commit-message.outputs.message }}
           run: |
               set -e
 
-              COMMIT_MESSAGE="chore(release): publish"
-              echo "Committing with message: $COMMIT_MESSAGE"
+              echo "Committing with message:"
+              echo "$COMMIT_MESSAGE"
 
               git add .
               git commit -m "$COMMIT_MESSAGE"

@@ -72,6 +72,8 @@ with:
 | `working-directory` |                                                | Directory to run commands inside                                                                                                         |
 | `git-user-name`     | `github-actions[bot]`                          | Git user.name for release commit                                                                                                         |
 | `git-user-email`    | `github-actions[bot]@users.noreply.github.com` | Git user.email for release commit                                                                                                        |
+| `commit-style`      | `normal`                                       | Commit message style: `normal` or `conventional`. Controls the format of the auto generated release commit message.                      |
+| `commit-message`    |                                                | Override the commit message completely. If set, `commit-style` and auto generation are ignored and this value is used as-is.             |
 
 ---
 
@@ -81,6 +83,64 @@ with:
 | ------------- | ----------------------------------------------------------- |
 | `published`   | `'true'` if a publish occurred                              |
 | `new_version` | Example new version extracted from Changesets (best effort) |
+
+---
+
+## Commit Messages
+
+This action generates a commit message based on the Changesets release information and the selected `commit-style`, unless you explicitly override it with `commit-message`.
+
+### `commit-style: normal` (default)
+
+-   **Single package**
+
+    ```text
+    Release `@technance/worphling@10.0.2`
+    ```
+
+-   **Multiple packages**
+
+    ```text
+    Release packages
+
+    - Released `@technance/worphling@12.3.1`
+    - Released `@technance/code-style@1.0.0`
+    - Released `@technance/stash@6.0.1`
+    ```
+
+-   **Fallback (no releases detected / status failure)**
+
+    ```text
+    Release package(s)
+    ```
+
+### `commit-style: conventional`
+
+-   **Single package**
+
+    ```text
+    chore: release @technance/worphling@10.0.2
+    ```
+
+-   **Multiple packages**
+
+    ```text
+    chore: release packages
+
+    - Released `@technance/worphling@12.3.1`
+    - Released `@technance/code-style@1.0.0`
+    - Released `@technance/stash@6.0.1`
+    ```
+
+-   **Fallback (no releases detected / status failure)**
+
+    ```text
+    chore: release package(s)
+    ```
+
+If the action cannot read release information from Changesets (for example if `changeset status` fails), it falls back to the `Release package(s)` / `chore: release package(s)` messages, depending on `commit-style`.
+
+If you set `commit-message`, that value is used directly and `commit-style` is ignored.
 
 ---
 
@@ -123,6 +183,12 @@ jobs:
                   # Recommended: supply a push token
                   push-token: ${{ secrets.RELEASE_PUSH_TOKEN }}
 
+                  # Optional: pick commit style (normal|conventional)
+                  # commit-style: "conventional"
+
+                  # Optional: fully override commit message
+                  # commit-message: "Release monorepo packages for sprint 42"
+
                   # Optional overrides
                   # working-directory: '.'
                   # install-command: 'pnpm install --frozen-lockfile'
@@ -136,19 +202,28 @@ jobs:
 ## How It Works (Step by Step)
 
 1. **Checkout repository**
+
 2. **Configure git** (sets bot user.name/email)
+
 3. **Setup pnpm and Node**
+
 4. **Authenticate npm registry** if `npm-token` is supplied
+
 5. **Install dependencies**
+
 6. **Build packages**
+
 7. **Check for pending Changesets**
+
 8. If changes exist:
 
     - Run version bump
     - Detect git diffs
+    - Generate a commit message based on `commit-style` and Changesets output
     - Commit and push the changes
 
 9. **Publish packages**
+
 10. Set `published` and `new_version` outputs
 
 ---
@@ -159,3 +234,5 @@ jobs:
 -   The action does **not** open PRs.
 -   It assumes your project uses Changesets with a standard setup.
 -   The action intentionally removes `.changeset/*.md` after versioning.
+-   Commit messages are generated based on Changesets status output; if that fails, the action falls back to generic `Release package(s)` / `chore: release package(s)` messages depending on `commit-style`.
+-   If `commit-message` is set, it takes precedence over all automatic commit message generation.
