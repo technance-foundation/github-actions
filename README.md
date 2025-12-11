@@ -13,7 +13,7 @@ This repository contains reusable **composite GitHub Actions** maintained by Tec
     Send GitHub event notifications to a Telegram chat.
 
 -   [Release](release/README.md)
-    Standardized release pipeline with pnpm + Changesets. Captures version, creates a Release PR or publishes, and can open a PR back to `main`.
+    Automated release pipeline using pnpm + Changesets. Runs on push to `main`, applies version bumps, removes consumed Changesets, commits the updated versions, and publishes packages.
 
 -   [Publish Any Commit](publish-any-commit/README.md)
     Preview-publish packages from any commit/PR using `pnpm dlx pkg-pr-new publish` for one or more package paths.
