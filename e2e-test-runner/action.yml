@@ -44,7 +44,7 @@ runs:
           uses: actions/checkout@v4
           with:
               repository: technance-foundation/github-actions
-              ref: main
+              ref: v1
               path: ./.github/actions/github-actions
               sparse-checkout: |
                   e2e-check
@@ -55,7 +55,7 @@ runs:
         # MARK CHECK AS IN_PROGRESS
         # -----------------------------------------------------
         - name: Mark check as in_progress
-          uses: technance-foundation/github-actions/e2e-check@main
+          uses: technance-foundation/github-actions/e2e-check@v1
           with:
               token: ${{ inputs.token }}
               check-run-id: ${{ inputs.check-run-id }}
@@ -65,7 +65,7 @@ runs:
         # SETUP & DEPENDENCIES
         # -----------------------------------------------------
         - name: Setup & install (root)
-          uses: technance-foundation/github-actions/setup@main
+          uses: technance-foundation/github-actions/setup@v1
           with:
               node-version: ${{ inputs.node-version }}
               pnpm-version: ${{ inputs.pnpm-version }}
@@ -117,7 +117,7 @@ runs:
         # -----------------------------------------------------
         - name: Complete check
           if: always()
-          uses: technance-foundation/github-actions/e2e-check@main
+          uses: technance-foundation/github-actions/e2e-check@v1
           with:
               token: ${{ inputs.token }}
               check-run-id: ${{ inputs.check-run-id }}

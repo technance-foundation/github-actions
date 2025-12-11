@@ -38,7 +38,7 @@ If you’re curious how that works, see: [RELAY.md](../RELAY.md)
 ## Usage Example
 
 ```yaml
-- uses: technance-foundation/github-actions/e2e-test-runner@main
+- uses: technance-foundation/github-actions/e2e-test-runner@v1
   with:
       token: ${{ steps.app-token.outputs.token }}
       check-run-id: ${{ inputs.check_run_id }}
