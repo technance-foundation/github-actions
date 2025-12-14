@@ -53,7 +53,7 @@ inputs:
         default: "pnpm build"
         required: false
     version-command:
-        description: "Changesets version command (bump versions and remove .changeset files)"
+        description: "Changesets version command (bump versions and removes .changeset files)"
         default: "pnpm run bump"
         required: false
     publish-command:
@@ -97,9 +97,7 @@ runs:
           uses: actions/checkout@v4
           with:
               fetch-depth: 0
-              # Use push-token if provided, otherwise fall back to GITHUB_TOKEN
               token: ${{ inputs.push-token != '' && inputs.push-token || github.token }}
-              # Only persist credentials when we are *not* using a custom push-token
               persist-credentials: ${{ inputs.push-token == '' }}
 
         - name: Setup git
@@ -133,12 +131,6 @@ runs:
                 exit 1
               fi
 
-              if ! command -v gh >/dev/null 2>&1; then
-                echo "gh (GitHub CLI) is required but was not found on PATH."
-                echo "On GitHub-hosted runners it is preinstalled. On self-hosted, install gh."
-                exit 1
-              fi
-
         - name: Authenticate NPM registry (optional)
           if: ${{ inputs.npm-token != '' }}
           shell: bash
@@ -160,17 +152,29 @@ runs:
                 exit 0
               fi
 
-              # Try to get JSON status without installing repo deps.
               if pnpm dlx @changesets/cli status --output=release.json; then
-                # Filter out ignored packages (from .changeset/config.json) before deciding whether to release
+                # Ignore list from .changeset/config.json
                 IGNORE_LIST="[]"
                 if [ -f ".changeset/config.json" ]; then
                   IGNORE_LIST="$(jq -c '.ignore // []' .changeset/config.json 2>/dev/null || echo '[]')"
                 fi
 
+                # Build a list of private package names by scanning package.json files
+                # This avoids needing pnpm install just to know what's private.
+                PRIVATE_LIST="$(
+                  find . -name package.json -not -path '*/node_modules/*' -print0 \
+                    | xargs -0 -I {} sh -c 'jq -r "select(.private==true) | .name // empty" "{}" 2>/dev/null || true' \
+                    | jq -R -s -c 'split("\n") | map(select(length>0))'
+                )"
+
+                # Apply both filters: ignored packages AND private packages
                 TMP_FILE="$(mktemp)"
-                if jq --argjson ignore "$IGNORE_LIST" '
-                  .releases = (.releases // [] | map(select(.name as $n | ($ignore | index($n) | not))))
+                if jq --argjson ignore "$IGNORE_LIST" --argjson priv "$PRIVATE_LIST" '
+                  .releases = (
+                    (.releases // [])
+                    | map(select(.name as $n | ($ignore | index($n) | not)))
+                    | map(select(.name as $n | ($priv   | index($n) | not)))
+                  )
                 ' release.json > "$TMP_FILE"; then
                   mv "$TMP_FILE" release.filtered.json
                 else
@@ -180,12 +184,11 @@ runs:
 
                 RELEASE_COUNT="$(jq -r '.releases | length' release.filtered.json || echo 0)"
                 if [ "$RELEASE_COUNT" -eq 0 ]; then
-                  echo "No pending (non-ignored) changesets; skipping release."
+                  echo "No pending (non-ignored, non-private) releases; skipping release."
                   echo "has_changesets=false" >> "$GITHUB_OUTPUT"
                 else
-                  echo "Found $RELEASE_COUNT pending (non-ignored) releases."
+                  echo "Found $RELEASE_COUNT pending (non-ignored, non-private) releases."
                   echo "has_changesets=true" >> "$GITHUB_OUTPUT"
-                  # Best-effort example new version
                   NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.filtered.json || echo '')"
                   echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
                 fi
@@ -303,11 +306,9 @@ runs:
               echo "Committing with message:"
               echo "$COMMIT_MESSAGE"
 
-              # Stage everything, then explicitly ensure release artifacts are NOT committed
               git add -A
               git reset -- release.json release.filtered.json 2>/dev/null || true
 
-              # If no changes remain staged, skip
               if git diff --cached --quiet; then
                 echo "No staged changes after excluding release artifacts; skipping commit."
                 exit 0
@@ -317,7 +318,6 @@ runs:
 
               CURRENT_BRANCH="${GITHUB_REF_NAME:-main}"
 
-              # Only unset the extraheader when we're going to use a PAT/App token
               if [ -n "$PUSH_TOKEN" ]; then
                 git config --local --unset-all http.https://github.com/.extraheader || true
                 echo "Configuring authenticated remote with provided push-token"
@@ -372,7 +372,6 @@ runs:
               echo "Tags to create:"
               echo "$TAGS"
 
-              # Ensure auth is correct for tag push as well
               if [ -n "$PUSH_TOKEN" ]; then
                 git config --local --unset-all http.https://github.com/.extraheader || true
                 git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
@@ -384,26 +383,6 @@ runs:
               done <<< "$TAGS"
 
               git push origin --tags
-
-        - name: Create GitHub releases for tags
-          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
-          shell: bash
-          working-directory: ${{ inputs.working-directory }}
-          env:
-              GH_TOKEN: ${{ inputs.push-token != '' && inputs.push-token || github.token }}
-          run: |
-              set -euo pipefail
-
-              TAGS="$(jq -r '.releases[] | "\(.name)@\(.newVersion)"' release.filtered.json)"
-
-              while IFS= read -r tag; do
-                [ -z "$tag" ] && continue
-                echo "Creating GitHub release: $tag"
-                gh release create "$tag" \
-                  --title "$tag" \
-                  --generate-notes \
-                  || echo "Release already exists (or cannot create): $tag"
-              done <<< "$TAGS"
 
         - name: Set outputs
           id: set-output

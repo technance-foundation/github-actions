@@ -1,6 +1,6 @@
 # Release (Changesets + pnpm, auto on main)
 
-This composite GitHub Action implements a **fully automated release flow** using Changesets and pnpm, including **npm publishing, git tags, and GitHub Releases**.
+This composite GitHub Action implements a **fully automated release flow** using Changesets and pnpm, including **npm publishing and git tags**.
 
 -   Runs on **push to `main`**
 -   Detects pending Changesets
@@ -8,7 +8,7 @@ This composite GitHub Action implements a **fully automated release flow** using
 -   Commits and pushes version bumps back to `main`
 -   Publishes packages to npm
 -   Creates **git tags** for released packages
--   Creates **GitHub Releases** for each published tag
+-   Automatically **excludes `private: true` packages** from commit messages and tags
 -   Does **not** open PRs or rely on `changesets/action@v1`
 
 > ⚠️ Important: Your workflow **must skip this action when the commit author is `github-actions[bot]`** to avoid infinite loops.
@@ -18,16 +18,16 @@ This composite GitHub Action implements a **fully automated release flow** using
 ## 🚨 Important: Who Pushes the Release Commit (and Tags)
 
 This action performs a **direct commit and push** to your release branch after applying version bumps.
-It also **pushes git tags** and **creates GitHub Releases**.
+It also **pushes git tags**.
 
 The actor used depends on how you configure `push-token`.
 
 ### How the actor is selected
 
-| Case                     | Actor used for commit / tag / release           | Notes                                  |
+| Case                     | Actor used for commit + tags                    | Notes                                  |
 | ------------------------ | ----------------------------------------------- | -------------------------------------- |
 | You provide `push-token` | That token’s identity (PAT or GitHub App token) | **Recommended** for protected branches |
-| You omit `push-token`    | Falls back to default `GITHUB_TOKEN`            | Often blocked by branch protection     |
+| You omit `push-token`    | Falls back to default `GITHUB_TOKEN`            | May be blocked by branch protection    |
 
 ### Why this matters
 
@@ -39,7 +39,7 @@ If your branch protections require:
 -   No force pushes
 -   or special review rules
 
-…then **`GITHUB_TOKEN` may not be allowed to push commits, tags, or create releases**, and the job will fail.
+…then **`GITHUB_TOKEN` may not be allowed to push commits or tags**, and the job will fail.
 
 ### Recommended setup
 
@@ -61,7 +61,7 @@ with:
 
 ## 🔐 Token & Auth Requirements (Important)
 
-Some ecosystems and registries require **multiple tokens to be present** to publish successfully.
+Some publish setups require **multiple tokens to be present** depending on your publish scripts and tooling.
 
 ### Recommended workflow env setup
 
@@ -72,31 +72,31 @@ env:
     NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
 ```
 
--   `npm-token` input is used to authenticate npm
--   `NODE_AUTH_TOKEN` is required by some publish commands
--   `push-token` controls **git push, tag push, and GitHub Releases**
+-   `npm-token` input is used to authenticate npm (`~/.npmrc`)
+-   `NODE_AUTH_TOKEN` is required by some publish flows/tools
+-   `push-token` controls pushing **release commits** and **tags**
 
 ---
 
 ## Inputs
 
-| Name                | Default                                        | Description                                                                                              |
-| ------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `node-version`      | `20`                                           | Node.js version                                                                                          |
-| `pnpm-version`      | `9.0.6`                                        | pnpm version                                                                                             |
-| `cache`             | `pnpm`                                         | Cache strategy for `actions/setup-node`                                                                  |
-| `npm-registry`      | `https://registry.npmjs.org`                   | NPM registry URL                                                                                         |
-| `npm-token`         |                                                | NPM token for publishing (required for publish)                                                          |
-| `push-token`        | _(empty)_                                      | Token used for commits, tags, and GitHub Releases. Required if branch protection blocks workflow pushes. |
-| `install-command`   | `pnpm install --frozen-lockfile`               | Dependency install command                                                                               |
-| `build-command`     | `pnpm build`                                   | Build command                                                                                            |
-| `version-command`   | `pnpm run bump`                                | Changesets version command (bumps versions and removes `.changeset` files)                               |
-| `publish-command`   | `pnpm run release`                             | Publish command                                                                                          |
-| `working-directory` |                                                | Directory to run commands inside                                                                         |
-| `git-user-name`     | `github-actions[bot]`                          | Git user.name for release commit                                                                         |
-| `git-user-email`    | `github-actions[bot]@users.noreply.github.com` | Git user.email for release commit                                                                        |
-| `commit-style`      | `normal`                                       | Commit message style: `normal` or `conventional`                                                         |
-| `commit-message`    |                                                | Fully override the commit message                                                                        |
+| Name                | Default                                        | Description                                                                                        |
+| ------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `node-version`      | `20`                                           | Node.js version                                                                                    |
+| `pnpm-version`      | `9.0.6`                                        | pnpm version                                                                                       |
+| `cache`             | `pnpm`                                         | Cache strategy for `actions/setup-node`                                                            |
+| `npm-registry`      | `https://registry.npmjs.org`                   | NPM registry URL                                                                                   |
+| `npm-token`         |                                                | NPM token for publishing (required for publish)                                                    |
+| `push-token`        | _(empty)_                                      | Token used to push release commits and tags. Required if branch protection blocks workflow pushes. |
+| `install-command`   | `pnpm install --frozen-lockfile`               | Dependency install command                                                                         |
+| `build-command`     | `pnpm build`                                   | Build command                                                                                      |
+| `version-command`   | `pnpm run bump`                                | Changesets version command (bumps versions and removes `.changeset` files)                         |
+| `publish-command`   | `pnpm run release`                             | Publish command                                                                                    |
+| `working-directory` |                                                | Directory to run commands inside                                                                   |
+| `git-user-name`     | `github-actions[bot]`                          | Git user.name for release commit                                                                   |
+| `git-user-email`    | `github-actions[bot]@users.noreply.github.com` | Git user.email for release commit                                                                  |
+| `commit-style`      | `normal`                                       | Commit message style: `normal` or `conventional`                                                   |
+| `commit-message`    |                                                | Fully override the commit message (disables auto generation)                                       |
 
 ---
 
@@ -109,26 +109,27 @@ env:
 
 ---
 
-## 🏷️ Git Tags & GitHub Releases
+## 🏷️ Git Tags
 
 When a publish occurs, the action:
 
-1. Creates **git tags** for each released package
+1. Creates **git tags** for each released package (from Changesets output)
    Example:
 
-    ```
+    ```text
     @technance/platform-sdk@5.2.1
     ```
 
 2. Pushes those tags to the repository
 
-3. Creates **GitHub Releases** for each tag using:
+### Private packages are excluded
 
-    - Tag name as the release title
-    - Auto-generated release notes (`gh release create --generate-notes`)
+Packages with `"private": true` in their `package.json` are automatically excluded from:
 
-> ℹ️ Requires the **GitHub CLI (`gh`)** to be available on the runner.
-> GitHub-hosted runners include it by default.
+-   The generated commit message
+-   Git tags
+
+This prevents internal-only workspaces (for example tooling packages) from being tagged as releases.
 
 ---
 
@@ -140,13 +141,13 @@ Commit messages are generated from Changesets output unless overridden.
 
 -   **Single package**
 
-    ```
+    ```text
     Release `@technance/worphling@10.0.2`
     ```
 
 -   **Multiple packages**
 
-    ```
+    ```text
     Release packages
 
     - Released `@technance/worphling@12.3.1`
@@ -155,7 +156,7 @@ Commit messages are generated from Changesets output unless overridden.
 
 -   **Fallback**
 
-    ```
+    ```text
     Release package(s)
     ```
 
@@ -163,13 +164,13 @@ Commit messages are generated from Changesets output unless overridden.
 
 -   **Single package**
 
-    ```
+    ```text
     chore: release @technance/worphling@10.0.2
     ```
 
 -   **Multiple packages**
 
-    ```
+    ```text
     chore: release packages
     ```
 
@@ -207,7 +208,7 @@ jobs:
             NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
 
         steps:
-            - name: Automated release
+            - name: Run automated release
               uses: technance-foundation/github-actions/release@v2
               with:
                   node-version: "22"
@@ -225,21 +226,23 @@ jobs:
 1. Checkout repository
 2. Configure git identity
 3. Setup Node.js and pnpm
-4. Verify required tools (`jq`, `gh`)
-5. Authenticate npm registry
-6. Install dependencies
-7. Build packages
-8. Detect pending Changesets
+4. Verify required tools (`jq`)
+5. Authenticate npm registry (if `npm-token` is provided)
+6. Detect pending Changesets (creates `release.json` and `release.filtered.json`)
+
+    - Filters out ignored packages from `.changeset/config.json`
+    - Filters out any `private: true` packages by scanning `package.json` files
+
+7. Install dependencies and build
+8. Run version bump (`version-command`)
 9. If changes exist:
 
-    - Run version bump
-    - Generate commit message
-    - Commit and push changes
+    - Generate commit message from the filtered release list
+    - Commit and push changes (release artifacts are not committed)
 
-10. Publish packages to npm
-11. Create git tags
-12. Create GitHub Releases
-13. Set outputs and clean up artifacts
+10. Publish packages (`publish-command`)
+11. Create and push git tags (from the filtered release list)
+12. Set outputs and clean up artifacts
 
 ---
 
@@ -249,4 +252,5 @@ jobs:
 -   Does **not** open PRs
 -   Assumes a standard Changesets setup
 -   Release metadata files (`release.json`, `release.filtered.json`) are **never committed**
--   If tagging or release creation fails due to permissions, publish may still succeed
+-   If tagging fails due to permissions, publish may still succeed
+-   To fully prevent private/internal packages from ever being versioned, also add them to `.changeset/config.json` `ignore`
