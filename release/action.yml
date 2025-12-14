@@ -304,6 +304,8 @@ runs:
               echo "Committing with message:"
               echo "$COMMIT_MESSAGE"
 
+              rm -f release.json release.filtered.json || true
+
               git add .
               git commit -m "$COMMIT_MESSAGE"
 
