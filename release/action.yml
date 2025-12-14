@@ -215,7 +215,17 @@ runs:
               STYLE="${COMMIT_STYLE:-normal}"
 
               if [ -f "release.json" ]; then
-                RELEASE_COUNT="$(jq -r '.releases | length' release.json || echo 0)"
+                # Filter out ignored packages (from .changeset/config.json) before building the message
+                IGNORE_LIST="[]"
+                if [ -f ".changeset/config.json" ]; then
+                  IGNORE_LIST="$(jq -c '.ignore // []' .changeset/config.json 2>/dev/null || echo '[]')"
+                fi
+
+                jq --argjson ignore "$IGNORE_LIST" '
+                  .releases = (.releases // [] | map(select(.name as $n | ($ignore | index($n) | not))))
+                ' release.json > release.filtered.json
+
+                RELEASE_COUNT="$(jq -r '.releases | length' release.filtered.json || echo 0)"
               else
                 echo "release.json not found; falling back to generic commit message."
                 RELEASE_COUNT=0
@@ -231,8 +241,8 @@ runs:
 
               elif [ "$RELEASE_COUNT" -eq 1 ]; then
                 # Single package
-                NAME="$(jq -r '.releases[0].name' release.json)"
-                VERSION="$(jq -r '.releases[0].newVersion' release.json)"
+                NAME="$(jq -r '.releases[0].name' release.filtered.json)"
+                VERSION="$(jq -r '.releases[0].newVersion' release.filtered.json)"
 
                 if [ "$STYLE" = "conventional" ]; then
                   MESSAGE="chore: release ${NAME}@${VERSION}"
@@ -253,7 +263,7 @@ runs:
                   NAME=$(echo "$ROW" | jq -r '.name')
                   VERSION=$(echo "$ROW" | jq -r '.newVersion')
                   MESSAGE="${MESSAGE}- Released \`${NAME}@${VERSION}\`\n"
-                done < <(jq -c '.releases[]' release.json)
+                done < <(jq -c '.releases[]' release.filtered.json)
               fi
 
               {
@@ -263,7 +273,7 @@ runs:
                 echo "EOF"
               } >> "$GITHUB_OUTPUT"
 
-              rm -f release.json || true
+              rm -f release.json release.filtered.json || true
 
         - name: Commit & push version bump
           if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
