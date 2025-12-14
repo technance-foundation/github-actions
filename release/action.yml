@@ -133,6 +133,12 @@ runs:
                 exit 1
               fi
 
+              if ! command -v gh >/dev/null 2>&1; then
+                echo "gh (GitHub CLI) is required but was not found on PATH."
+                echo "On GitHub-hosted runners it is preinstalled. On self-hosted, install gh."
+                exit 1
+              fi
+
         - name: Authenticate NPM registry (optional)
           if: ${{ inputs.npm-token != '' }}
           shell: bash
@@ -200,7 +206,6 @@ runs:
           working-directory: ${{ inputs.working-directory }}
           run: ${{ inputs.build-command }}
 
-        # Run versioning (bump versions, update changelogs, remove .changeset/*.md)
         - name: Apply version bumps with Changesets
           if: ${{ steps.changeset-status.outputs.has_changesets == 'true' }}
           shell: bash
@@ -210,7 +215,6 @@ runs:
               echo "Running version command: ${{ inputs.version-command }}"
               ${{ inputs.version-command }}
 
-        # Check if versioning actually changed anything
         - name: Check for git changes after versioning
           if: ${{ steps.changeset-status.outputs.has_changesets == 'true' }}
           id: git-diff
@@ -248,7 +252,6 @@ runs:
               fi
 
               if [ "$RELEASE_COUNT" -eq 0 ]; then
-                # No detectable releases -- fallback
                 if [ "$STYLE" = "conventional" ]; then
                   MESSAGE="chore: release package(s)"
                 else
@@ -256,7 +259,6 @@ runs:
                 fi
 
               elif [ "$RELEASE_COUNT" -eq 1 ]; then
-                # Single package
                 NAME="$(jq -r '.releases[0].name' "$RELEASE_FILE")"
                 VERSION="$(jq -r '.releases[0].newVersion' "$RELEASE_FILE")"
 
@@ -267,14 +269,12 @@ runs:
                 fi
 
               else
-                # Multiple packages
                 if [ "$STYLE" = "conventional" ]; then
                   MESSAGE="chore: release packages\n\n"
                 else
                   MESSAGE="Release packages\n\n"
                 fi
 
-                # Append bullet list
                 while IFS= read -r ROW; do
                   NAME=$(echo "$ROW" | jq -r '.name')
                   VERSION=$(echo "$ROW" | jq -r '.newVersion')
@@ -296,31 +296,34 @@ runs:
           env:
               GITHUB_REF_NAME: ${{ github.ref_name }}
               PUSH_TOKEN: ${{ inputs.push-token }}
-              # If commit-message input is set, use it. Otherwise use the generated one.
               COMMIT_MESSAGE: ${{ inputs.commit-message != '' && inputs.commit-message || steps.commit-message.outputs.message }}
           run: |
-              set -e
+              set -euo pipefail
 
               echo "Committing with message:"
               echo "$COMMIT_MESSAGE"
 
-              rm -f release.json release.filtered.json || true
+              # Stage everything, then explicitly ensure release artifacts are NOT committed
+              git add -A
+              git reset -- release.json release.filtered.json 2>/dev/null || true
 
-              git add .
+              # If no changes remain staged, skip
+              if git diff --cached --quiet; then
+                echo "No staged changes after excluding release artifacts; skipping commit."
+                exit 0
+              fi
+
               git commit -m "$COMMIT_MESSAGE"
 
               CURRENT_BRANCH="${GITHUB_REF_NAME:-main}"
 
-              # Ensure no GITHUB_TOKEN extraheader is overriding our PAT (defensive)
-              git config --local --unset-all http.https://github.com/.extraheader || true
-
-              # Configure remote with PAT *before* any fetch/rebase/push
+              # Only unset the extraheader when we're going to use a PAT/App token
               if [ -n "$PUSH_TOKEN" ]; then
+                git config --local --unset-all http.https://github.com/.extraheader || true
                 echo "Configuring authenticated remote with provided push-token"
                 git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
               else
-                echo "WARNING: no push-token provided, falling back to unauthenticated remote."
-                echo "If the branch is protected and requires a bypass actor, this push may be rejected."
+                echo "No push-token provided; using checkout credentials (GITHUB_TOKEN)."
               fi
 
               echo "Rebasing on latest origin/${CURRENT_BRANCH} before push"
@@ -350,6 +353,57 @@ runs:
               set -e
               echo "Running publish command: ${{ inputs.publish-command }}"
               ${{ inputs.publish-command }}
+
+        - name: Create git tags for released packages
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              PUSH_TOKEN: ${{ inputs.push-token }}
+          run: |
+              set -euo pipefail
+
+              if [ ! -f release.filtered.json ]; then
+                echo "release.filtered.json not found; cannot tag."
+                exit 1
+              fi
+
+              TAGS="$(jq -r '.releases[] | "\(.name)@\(.newVersion)"' release.filtered.json)"
+              echo "Tags to create:"
+              echo "$TAGS"
+
+              # Ensure auth is correct for tag push as well
+              if [ -n "$PUSH_TOKEN" ]; then
+                git config --local --unset-all http.https://github.com/.extraheader || true
+                git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+              fi
+
+              while IFS= read -r tag; do
+                [ -z "$tag" ] && continue
+                git tag "$tag" || echo "Tag already exists: $tag"
+              done <<< "$TAGS"
+
+              git push origin --tags
+
+        - name: Create GitHub releases for tags
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              GH_TOKEN: ${{ inputs.push-token != '' && inputs.push-token || github.token }}
+          run: |
+              set -euo pipefail
+
+              TAGS="$(jq -r '.releases[] | "\(.name)@\(.newVersion)"' release.filtered.json)"
+
+              while IFS= read -r tag; do
+                [ -z "$tag" ] && continue
+                echo "Creating GitHub release: $tag"
+                gh release create "$tag" \
+                  --title "$tag" \
+                  --generate-notes \
+                  || echo "Release already exists (or cannot create): $tag"
+              done <<< "$TAGS"
 
         - name: Set outputs
           id: set-output
