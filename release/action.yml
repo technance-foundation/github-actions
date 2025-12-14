@@ -123,6 +123,16 @@ runs:
               cache-dependency-path: |
                   **/pnpm-lock.yaml
 
+        - name: Verify required tools
+          shell: bash
+          run: |
+              set -e
+              if ! command -v jq >/dev/null 2>&1; then
+                echo "jq is required but was not found on PATH."
+                echo "If you're using a self-hosted runner, install jq (and ensure bash is available)."
+                exit 1
+              fi
+
         - name: Authenticate NPM registry (optional)
           if: ${{ inputs.npm-token != '' }}
           shell: bash
@@ -131,23 +141,12 @@ runs:
           run: |
               echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
 
-        - name: Install dependencies
-          shell: bash
-          working-directory: ${{ inputs.working-directory }}
-          run: ${{ inputs.install-command }}
-
-        - name: Build packages
-          shell: bash
-          working-directory: ${{ inputs.working-directory }}
-          run: ${{ inputs.build-command }}
-
-        # Detect pending changesets
         - name: Check for pending changesets
           id: changeset-status
           shell: bash
           working-directory: ${{ inputs.working-directory }}
           run: |
-              set -e
+              set -euo pipefail
 
               if [ ! -d ".changeset" ]; then
                 echo "has_changesets=false" >> "$GITHUB_OUTPUT"
@@ -155,23 +154,51 @@ runs:
                 exit 0
               fi
 
-              # Try to get JSON status; if it fails, assume no changesets.
-              if pnpm changeset status --output=release.json 2>/dev/null; then
-                RELEASE_COUNT="$(jq -r '.releases | length' release.json || echo 0)"
+              # Try to get JSON status without installing repo deps.
+              if pnpm dlx @changesets/cli status --output=release.json; then
+                # Filter out ignored packages (from .changeset/config.json) before deciding whether to release
+                IGNORE_LIST="[]"
+                if [ -f ".changeset/config.json" ]; then
+                  IGNORE_LIST="$(jq -c '.ignore // []' .changeset/config.json 2>/dev/null || echo '[]')"
+                fi
+
+                TMP_FILE="$(mktemp)"
+                if jq --argjson ignore "$IGNORE_LIST" '
+                  .releases = (.releases // [] | map(select(.name as $n | ($ignore | index($n) | not))))
+                ' release.json > "$TMP_FILE"; then
+                  mv "$TMP_FILE" release.filtered.json
+                else
+                  rm -f "$TMP_FILE" || true
+                  echo '{"releases":[]}' > release.filtered.json
+                fi
+
+                RELEASE_COUNT="$(jq -r '.releases | length' release.filtered.json || echo 0)"
                 if [ "$RELEASE_COUNT" -eq 0 ]; then
-                  echo "No pending changesets; skipping release."
+                  echo "No pending (non-ignored) changesets; skipping release."
                   echo "has_changesets=false" >> "$GITHUB_OUTPUT"
                 else
-                  echo "Found $RELEASE_COUNT pending releases."
+                  echo "Found $RELEASE_COUNT pending (non-ignored) releases."
                   echo "has_changesets=true" >> "$GITHUB_OUTPUT"
                   # Best-effort example new version
-                  NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.json || echo '')"
+                  NEW_VERSION="$(jq -r '.releases[0].newVersion // empty' release.filtered.json || echo '')"
                   echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
                 fi
               else
-                echo "changeset status failed or no pending releases; skipping."
-                echo "has_changesets=false" >> "$GITHUB_OUTPUT"
+                echo "changeset status failed; aborting." >&2
+                exit 1
               fi
+
+        - name: Install dependencies
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: ${{ inputs.install-command }}
+
+        - name: Build packages
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: ${{ inputs.build-command }}
 
         # Run versioning (bump versions, update changelogs, remove .changeset/*.md)
         - name: Apply version bumps with Changesets
@@ -212,11 +239,12 @@ runs:
 
               STYLE="${COMMIT_STYLE:-normal}"
 
-              if [ -f "release.json" ]; then
-                RELEASE_COUNT="$(jq -r '.releases | length' release.json || echo 0)"
-              else
-                echo "release.json not found; falling back to generic commit message."
+              RELEASE_FILE="release.filtered.json"
+              if [ ! -f "$RELEASE_FILE" ]; then
+                echo "release.filtered.json not found; falling back to generic commit message."
                 RELEASE_COUNT=0
+              else
+                RELEASE_COUNT="$(jq -r '.releases | length' "$RELEASE_FILE" || echo 0)"
               fi
 
               if [ "$RELEASE_COUNT" -eq 0 ]; then
@@ -229,8 +257,8 @@ runs:
 
               elif [ "$RELEASE_COUNT" -eq 1 ]; then
                 # Single package
-                NAME="$(jq -r '.releases[0].name' release.json)"
-                VERSION="$(jq -r '.releases[0].newVersion' release.json)"
+                NAME="$(jq -r '.releases[0].name' "$RELEASE_FILE")"
+                VERSION="$(jq -r '.releases[0].newVersion' "$RELEASE_FILE")"
 
                 if [ "$STYLE" = "conventional" ]; then
                   MESSAGE="chore: release ${NAME}@${VERSION}"
@@ -251,7 +279,7 @@ runs:
                   NAME=$(echo "$ROW" | jq -r '.name')
                   VERSION=$(echo "$ROW" | jq -r '.newVersion')
                   MESSAGE="${MESSAGE}- Released \`${NAME}@${VERSION}\`\n"
-                done < <(jq -c '.releases[]' release.json)
+                done < <(jq -c '.releases[]' "$RELEASE_FILE")
               fi
 
               {
@@ -260,8 +288,6 @@ runs:
                 echo
                 echo "EOF"
               } >> "$GITHUB_OUTPUT"
-
-              rm -f release.json || true
 
         - name: Commit & push version bump
           if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
@@ -337,3 +363,10 @@ runs:
 
               echo "published=$PUBLISHED" >> "$GITHUB_OUTPUT"
               echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+        - name: Cleanup release files
+          if: ${{ always() }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: |
+              rm -f release.json release.filtered.json || true
