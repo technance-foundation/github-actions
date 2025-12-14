@@ -131,17 +131,6 @@ runs:
           run: |
               echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
 
-        - name: Install dependencies
-          shell: bash
-          working-directory: ${{ inputs.working-directory }}
-          run: ${{ inputs.install-command }}
-
-        - name: Build packages
-          shell: bash
-          working-directory: ${{ inputs.working-directory }}
-          run: ${{ inputs.build-command }}
-
-        # Detect pending changesets
         - name: Check for pending changesets
           id: changeset-status
           shell: bash
@@ -155,8 +144,9 @@ runs:
                 exit 0
               fi
 
-              # Try to get JSON status; if it fails, assume no changesets.
-              if pnpm changeset status --output=release.json 2>/dev/null; then
+              # Try to get JSON status without installing repo deps.
+              # If it fails, assume no changesets.
+              if pnpm dlx @changesets/cli status --output=release.json 2>/dev/null; then
                 RELEASE_COUNT="$(jq -r '.releases | length' release.json || echo 0)"
                 if [ "$RELEASE_COUNT" -eq 0 ]; then
                   echo "No pending changesets; skipping release."
@@ -172,6 +162,18 @@ runs:
                 echo "changeset status failed or no pending releases; skipping."
                 echo "has_changesets=false" >> "$GITHUB_OUTPUT"
               fi
+
+        - name: Install dependencies
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: ${{ inputs.install-command }}
+
+        - name: Build packages
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          run: ${{ inputs.build-command }}
 
         # Run versioning (bump versions, update changelogs, remove .changeset/*.md)
         - name: Apply version bumps with Changesets
