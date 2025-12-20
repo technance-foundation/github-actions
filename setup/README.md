@@ -22,6 +22,7 @@ It handles environment setup, dependency installation, caching, and optional bui
 | `npm-token`    | NPM token for authenticating to the NPM registry. Required if installing from private packages.                                  |
 | `install`      | Either `"false"` to skip installing dependencies, or the install command to run. Default is `pnpm install --no-frozen-lockfile`. |
 | `build`        | Either `"false"` to skip building, or the build command to run. Default is `pnpm build`.                                         |
+| `working-directory` | The working directory to run the commands in. Default is `.`.                                                               |
 
 ## Usage
 
@@ -67,4 +68,15 @@ You can override the defaults:
   npm-token: ${{ secrets.NPM_TOKEN }}
   install: "pnpm install --frozen-lockfile"
   build: "pnpm run build:prod"
+```
+
+### Custom Working Directory
+
+If your project is in a subdirectory:
+
+```yaml
+- uses: technance-foundation/github-actions/setup@v1
+  with:
+    npm-token: ${{ secrets.NPM_TOKEN }}
+    working-directory: "./sdks/node"
 ```
