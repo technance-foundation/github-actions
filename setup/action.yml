@@ -20,6 +20,9 @@ inputs:
     build:
         description: "Either false or the build command to run, default is `pnpm build`"
         default: "pnpm build"
+    working-directory:
+        description: "The working directory to run the commands in"
+        default: "."
 
 runs:
     using: "composite"
@@ -39,6 +42,7 @@ runs:
         - name: Get pnpm store directory
           id: pnpm-cache
           shell: bash
+          working-directory: ${{ inputs.working-directory }}
           run: |
               echo "STORE_PATH<<EOF" >> "$GITHUB_OUTPUT"
               pnpm store path >> "$GITHUB_OUTPUT"
@@ -49,20 +53,20 @@ runs:
           name: Initialize pnpm cache
           with:
               path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-              key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/package.json') }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+              key: ${{ runner.os }}-node-${{ inputs.node-version }}-pnpm-store-${{ hashFiles(format('{0}/**/package.json', inputs.working-directory)) }}-${{ hashFiles(format('{0}/**/pnpm-lock.yaml', inputs.working-directory)) }}
               restore-keys: |
-                  ${{ runner.os }}-pnpm-store-${{ hashFiles('**/package.json') }}-
-                  ${{ runner.os }}-pnpm-store-
+                  ${{ runner.os }}-node-${{ inputs.node-version }}-pnpm-store-${{ hashFiles(format('{0}/**/package.json', inputs.working-directory)) }}-
+                  ${{ runner.os }}-node-${{ inputs.node-version }}-pnpm-store-
 
         - uses: actions/cache@v4
           if: ${{ inputs.pnpm-cache == 'write' }}
           name: Initialize pnpm cache
           with:
               path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-              key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/package.json') }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+              key: ${{ runner.os }}-node-${{ inputs.node-version }}-pnpm-store-${{ hashFiles(format('{0}/**/package.json', inputs.working-directory)) }}-${{ hashFiles(format('{0}/**/pnpm-lock.yaml', inputs.working-directory)) }}
               restore-keys: |
-                  ${{ runner.os }}-pnpm-store-${{ hashFiles('**/package.json') }}-
-                  ${{ runner.os }}-pnpm-store-
+                  ${{ runner.os }}-node-${{ inputs.node-version }}-pnpm-store-${{ hashFiles(format('{0}/**/package.json', inputs.working-directory)) }}-
+                  ${{ runner.os }}-node-${{ inputs.node-version }}-pnpm-store-
 
         - name: Authenticate NPM registry
           shell: bash
@@ -71,9 +75,11 @@ runs:
         - name: Install dependencies
           if: ${{ inputs.install != 'false' }}
           shell: bash
+          working-directory: ${{ inputs.working-directory }}
           run: ${{ inputs.install }}
 
         - name: Build
           if: ${{ inputs.build != 'false' }}
           shell: bash
+          working-directory: ${{ inputs.working-directory }}
           run: ${{ inputs.build }}
