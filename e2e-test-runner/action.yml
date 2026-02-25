@@ -41,6 +41,7 @@ runs:
         # Check out action source WITHOUT wiping caller repo
         # =========================================================
         - name: Checkout action source
+          id: checkout-action
           uses: actions/checkout@v4
           with:
               repository: technance-foundation/github-actions
@@ -55,6 +56,7 @@ runs:
         # MARK CHECK AS IN_PROGRESS
         # -----------------------------------------------------
         - name: Mark check as in_progress
+          id: mark-in-progress
           uses: technance-foundation/github-actions/e2e-check@v1
           with:
               token: ${{ inputs.token }}
@@ -65,6 +67,7 @@ runs:
         # SETUP & DEPENDENCIES
         # -----------------------------------------------------
         - name: Setup & install (root)
+          id: setup
           uses: technance-foundation/github-actions/setup@v1
           with:
               node-version: ${{ inputs.node-version }}
@@ -87,6 +90,7 @@ runs:
                   ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-
 
         - name: Install Playwright deps + browsers (cache miss)
+          id: pw-install
           if: steps.cache-playwright.outputs.cache-hit != 'true'
           shell: bash
           run: pnpm exec playwright install --with-deps chromium
@@ -95,6 +99,7 @@ runs:
         # RUN TESTS
         # -----------------------------------------------------
         - name: Run E2E tests
+          id: e2e
           shell: bash
           working-directory: apps/${{ inputs.project }}
           env:
@@ -105,6 +110,7 @@ runs:
         # REPORT
         # -----------------------------------------------------
         - name: Upload Playwright report
+          id: upload-report
           if: always()
           uses: actions/upload-artifact@v4
           with:
@@ -122,6 +128,6 @@ runs:
               token: ${{ inputs.token }}
               check-run-id: ${{ inputs.check-run-id }}
               state: completed
-              job-status: ${{ job.status }}
+              job-status: ${{ (steps.checkout-action.outcome == 'success' && steps.mark-in-progress.outcome == 'success' && steps.setup.outcome == 'success' && steps.cache-playwright.outcome == 'success' && (steps.pw-install.outcome == 'success' || steps.pw-install.outcome == 'skipped') && steps.e2e.outcome == 'success' && steps.upload-report.outcome == 'success') && 'success' || 'failure' }}
               project: ${{ inputs.project }}
               preview-url: ${{ inputs.preview-url }}
