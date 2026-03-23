@@ -123,7 +123,7 @@ runs:
           uses: actions/upload-artifact@v4
           with:
               name: ${{ inputs.project }}-playwright-report
-              path: apps/${{ inputs.project }}/playwright-report/
+              path: ${{ inputs.working-directory != '' && format('{0}/playwright-report/', inputs.working-directory) || format('apps/{0}/playwright-report/', inputs.project) }}
               retention-days: 30
 
         # -----------------------------------------------------
