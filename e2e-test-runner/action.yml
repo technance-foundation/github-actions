@@ -39,6 +39,9 @@ inputs:
         default: "pnpm run test:e2e"
         required: false
 
+    working-directory:
+        description: "Working directory where E2E tests should run"
+        required: false
 runs:
     using: composite
     steps:
@@ -106,7 +109,7 @@ runs:
         - name: Run E2E tests
           id: e2e
           shell: bash
-          working-directory: apps/${{ inputs.project }}
+          working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || format('apps/{0}', inputs.project) }}
           env:
               BASE_URL: ${{ inputs.preview-url }}
           run: ${{ inputs.test-command }}
