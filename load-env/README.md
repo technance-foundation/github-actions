@@ -4,9 +4,9 @@ This GitHub Action loads environment variables from a `.env`‑style file into t
 
 ## Features
 
--   Reads variables from any `.env`‑style file
--   Supports comments (`# ...`) and blank lines inside the `.env` file
--   Provides the loaded environment variables by exporting them into `$GITHUB_ENV`
+- Reads variables from any `.env`‑style file
+- Supports comments (`# ...`) and blank lines inside the `.env` file
+- Provides the loaded environment variables by exporting them into `$GITHUB_ENV`
 
 ## Inputs
 
@@ -27,7 +27,7 @@ jobs:
     example:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
 
             - name: Load environment variables
               uses: technance-foundation/github-actions/load-env@v1
@@ -40,5 +40,5 @@ jobs:
 
 ## Notes
 
--   This action **does not** override variables already set in the workflow or job `env:` block — those take precedence.
--   If the file path provided in `file` does not exist, the action will fail.
+- This action **does not** override variables already set in the workflow or job `env:` block — those take precedence.
+- If the file path provided in `file` does not exist, the action will fail.

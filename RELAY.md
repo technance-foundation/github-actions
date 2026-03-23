@@ -17,10 +17,10 @@ https://github.com/technance-foundation/vercel-to-github-relay
 
 This is the service responsible for:
 
--   Listening to GitHub App webhooks
--   Detecting preview deployments
--   Triggering `workflow_dispatch` for E2E runs
--   Managing check runs
+- Listening to GitHub App webhooks
+- Detecting preview deployments
+- Triggering `workflow_dispatch` for E2E runs
+- Managing check runs
 
 ---
 
@@ -54,7 +54,6 @@ Here’s the lifecycle of a typical PR:
 
 4. Once the preview is ready, it starts the GitHub workflow.
    It triggers the E2E workflow using `workflow_dispatch`, passing:
-
     - the preview URL
     - the project name
     - the check run ID it created earlier
@@ -70,10 +69,10 @@ The Relay ensures that tests only run when the environment is truly ready, and G
 
 It’s a very lightweight service. It only needs a few things:
 
--   GitHub App credentials
-    (App ID, Private Key, Installation ID)
--   A way to check deployment status on your preview host
--   Any environment capable of running a small web service
+- GitHub App credentials
+  (App ID, Private Key, Installation ID)
+- A way to check deployment status on your preview host
+- Any environment capable of running a small web service
 
 That’s it. There’s no heavy infrastructure behind it.
 
@@ -104,10 +103,10 @@ The `e2e-test-runner` uses them to run tests and update the check.
 
 You’ll notice it immediately:
 
--   “E2E Tests” checks get created, but never move past “Queued”.
--   The preview URL is missing.
--   No workflow triggers.
--   No reports show up.
+- “E2E Tests” checks get created, but never move past “Queued”.
+- The preview URL is missing.
+- No workflow triggers.
+- No reports show up.
 
 When this happens, the E2E system hasn’t broken — it’s simply waiting for the Relay to do its job.
 
@@ -115,7 +114,7 @@ When this happens, the E2E system hasn’t broken — it’s simply waiting for 
 
 ## In short
 
--   The Relay connects your preview deployments to your E2E test workflow.
--   GitHub handles the workflow execution.
--   The test runner handles the actual testing.
--   The Relay ties it together so that E2E checks behave like part of the PR experience instead of an afterthought.
+- The Relay connects your preview deployments to your E2E test workflow.
+- GitHub handles the workflow execution.
+- The test runner handles the actual testing.
+- The Relay ties it together so that E2E checks behave like part of the PR experience instead of an afterthought.

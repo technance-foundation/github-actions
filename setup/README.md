@@ -5,24 +5,24 @@ It handles environment setup, dependency installation, caching, and optional bui
 
 ## Features
 
--   Sets up Node.js and pnpm for the workflow
--   Restores and saves the pnpm store cache for faster installs
--   Authenticates to the NPM registry (for private packages)
--   Installs dependencies (optional)
--   Builds the project (optional)
--   Allows overriding install/build commands or skipping them entirely
+- Sets up Node.js and pnpm for the workflow
+- Restores and saves the pnpm store cache for faster installs
+- Authenticates to the NPM registry (for private packages)
+- Installs dependencies (optional)
+- Builds the project (optional)
+- Allows overriding install/build commands or skipping them entirely
 
 ## Inputs
 
-| Input          | Description                                                                                                                      |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `node-version` | The version of Node.js to use. Default is `20`.                                                                                  |
-| `pnpm-version` | The version of pnpm to use. Default is `9.0.6`.                                                                                  |
-| `pnpm-cache`   | Cache strategy can be one of `read`, `write`, or `off`. Default is `write`                                                       |
-| `npm-token`    | NPM token for authenticating to the NPM registry. Required if installing from private packages.                                  |
-| `install`      | Either `"false"` to skip installing dependencies, or the install command to run. Default is `pnpm install --no-frozen-lockfile`. |
-| `build`        | Either `"false"` to skip building, or the build command to run. Default is `pnpm build`.                                         |
-| `working-directory` | The working directory to run the commands in. Default is `.`.                                                               |
+| Input               | Description                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `node-version`      | The version of Node.js to use. Default is `20`.                                                                                  |
+| `pnpm-version`      | The version of pnpm to use. Default is `9.0.6`.                                                                                  |
+| `pnpm-cache`        | Cache strategy can be one of `read`, `write`, or `off`. Default is `write`                                                       |
+| `npm-token`         | NPM token for authenticating to the NPM registry. Required if installing from private packages.                                  |
+| `install`           | Either `"false"` to skip installing dependencies, or the install command to run. Default is `pnpm install --no-frozen-lockfile`. |
+| `build`             | Either `"false"` to skip building, or the build command to run. Default is `pnpm build`.                                         |
+| `working-directory` | The working directory to run the commands in. Default is `.`.                                                                    |
 
 ## Usage
 
@@ -77,6 +77,6 @@ If your project is in a subdirectory:
 ```yaml
 - uses: technance-foundation/github-actions/setup@v1
   with:
-    npm-token: ${{ secrets.NPM_TOKEN }}
-    working-directory: "./sdks/node"
+      npm-token: ${{ secrets.NPM_TOKEN }}
+      working-directory: "./sdks/node"
 ```

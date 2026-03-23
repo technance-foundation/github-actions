@@ -2,14 +2,14 @@
 
 This composite GitHub Action implements a **fully automated release flow** using Changesets and pnpm, including **npm publishing and git tags**.
 
--   Runs on **push to `main`**
--   Detects pending Changesets
--   Bumps versions and removes `.changeset/*.md`
--   Commits and pushes version bumps back to `main`
--   Publishes packages to npm
--   Creates **git tags** for released packages
--   Automatically **excludes `private: true` packages** from commit messages and tags
--   Does **not** open PRs or rely on `changesets/action@v1`
+- Runs on **push to `main`**
+- Detects pending Changesets
+- Bumps versions and removes `.changeset/*.md`
+- Commits and pushes version bumps back to `main`
+- Publishes packages to npm
+- Creates **git tags** for released packages
+- Automatically **excludes `private: true` packages** from commit messages and tags
+- Does **not** open PRs or rely on `changesets/action@v1`
 
 > ⚠️ Important: Your workflow **must skip this action when the commit author is `github-actions[bot]`** to avoid infinite loops.
 
@@ -33,21 +33,20 @@ The actor used depends on how you configure `push-token`.
 
 If your branch protections require:
 
--   Bypass permissions
--   Non GitHub Actions actors
--   Linear history
--   No force pushes
--   or special review rules
+- Bypass permissions
+- Non GitHub Actions actors
+- Linear history
+- No force pushes
+- or special review rules
 
 …then **`GITHUB_TOKEN` may not be allowed to push commits or tags**, and the job will fail.
 
 ### Recommended setup
 
--   Use a **GitHub App installation token** or a **dedicated bot PAT** via `push-token`.
--   If you rely on `GITHUB_TOKEN`, ensure your repo allows:
-
-    -   `Allow GitHub Actions to bypass branch protection rules`
-    -   `contents: write` permission in the workflow
+- Use a **GitHub App installation token** or a **dedicated bot PAT** via `push-token`.
+- If you rely on `GITHUB_TOKEN`, ensure your repo allows:
+    - `Allow GitHub Actions to bypass branch protection rules`
+    - `contents: write` permission in the workflow
 
 ### Example using a push-token (recommended)
 
@@ -72,9 +71,9 @@ env:
     NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
 ```
 
--   `npm-token` input is used to authenticate npm (`~/.npmrc`)
--   `NODE_AUTH_TOKEN` is required by some publish flows/tools
--   `push-token` controls pushing **release commits** and **tags**
+- `npm-token` input is used to authenticate npm (`~/.npmrc`)
+- `NODE_AUTH_TOKEN` is required by some publish flows/tools
+- `push-token` controls pushing **release commits** and **tags**
 
 ---
 
@@ -126,8 +125,8 @@ When a publish occurs, the action:
 
 Packages with `"private": true` in their `package.json` are automatically excluded from:
 
--   The generated commit message
--   Git tags
+- The generated commit message
+- Git tags
 
 This prevents internal-only workspaces (for example tooling packages) from being tagged as releases.
 
@@ -139,13 +138,13 @@ Commit messages are generated from Changesets output unless overridden.
 
 ### `commit-style: normal` (default)
 
--   **Single package**
+- **Single package**
 
     ```text
     Release `@technance/worphling@10.0.2`
     ```
 
--   **Multiple packages**
+- **Multiple packages**
 
     ```text
     Release packages
@@ -154,7 +153,7 @@ Commit messages are generated from Changesets output unless overridden.
     - Released `@technance/code-style@1.0.0`
     ```
 
--   **Fallback**
+- **Fallback**
 
     ```text
     Release package(s)
@@ -162,13 +161,13 @@ Commit messages are generated from Changesets output unless overridden.
 
 ### `commit-style: conventional`
 
--   **Single package**
+- **Single package**
 
     ```text
     chore: release @technance/worphling@10.0.2
     ```
 
--   **Multiple packages**
+- **Multiple packages**
 
     ```text
     chore: release packages
@@ -229,14 +228,12 @@ jobs:
 4. Verify required tools (`jq`)
 5. Authenticate npm registry (if `npm-token` is provided)
 6. Detect pending Changesets (creates `release.json` and `release.filtered.json`)
-
     - Filters out ignored packages from `.changeset/config.json`
     - Filters out any `private: true` packages by scanning `package.json` files
 
 7. Install dependencies and build
 8. Run version bump (`version-command`)
 9. If changes exist:
-
     - Generate commit message from the filtered release list
     - Commit and push changes (release artifacts are not committed)
 
@@ -248,9 +245,9 @@ jobs:
 
 ## Notes and Limitations
 
--   Performs a **direct push to main**
--   Does **not** open PRs
--   Assumes a standard Changesets setup
--   Release metadata files (`release.json`, `release.filtered.json`) are **never committed**
--   If tagging fails due to permissions, publish may still succeed
--   To fully prevent private/internal packages from ever being versioned, also add them to `.changeset/config.json` `ignore`
+- Performs a **direct push to main**
+- Does **not** open PRs
+- Assumes a standard Changesets setup
+- Release metadata files (`release.json`, `release.filtered.json`) are **never committed**
+- If tagging fails due to permissions, publish may still succeed
+- To fully prevent private/internal packages from ever being versioned, also add them to `.changeset/config.json` `ignore`

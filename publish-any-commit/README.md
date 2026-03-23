@@ -92,8 +92,8 @@ with:
 
 ## Requirements
 
--   `npm-token` input is optional - only needed for private registry authentication.
--   The workflow that uses this action typically runs on:
+- `npm-token` input is optional - only needed for private registry authentication.
+- The workflow that uses this action typically runs on:
 
     ```yaml
     on:

@@ -4,8 +4,8 @@ Reusable composite GitHub Action that updates GitHub Check Runs for E2E tests.
 
 It implements two states:
 
--   **`in_progress`** — called at the start of the workflow
--   **`completed`** — called at the end, posting the summary
+- **`in_progress`** — called at the start of the workflow
+- **`completed`** — called at the end, posting the summary
 
 This action wraps the logic from our relay-driven E2E system and allows any workflow in any repo to easily update check runs.
 

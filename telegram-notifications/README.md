@@ -4,11 +4,11 @@
 
 This GitHub Action can be used in any repository to send notifications to a Telegram chat. The following pull request events will trigger a notification:
 
--   Pull request approved
--   Changes requested on a pull request
--   Comment added to a pull request review
--   Pull request opened (in draft or non-draft state)
--   Pull request marked as ready for review
+- Pull request approved
+- Changes requested on a pull request
+- Comment added to a pull request review
+- Pull request opened (in draft or non-draft state)
+- Pull request marked as ready for review
 
 ## Example
 

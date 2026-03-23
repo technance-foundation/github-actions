@@ -33,7 +33,7 @@ runs:
         # FIX: safe checkout (does NOT override caller repo)
         # =========================================================
         - name: Checkout action source
-          uses: actions/checkout@v4
+          uses: actions/checkout@v6
           with:
               repository: technance-foundation/github-actions
               ref: v1
@@ -74,7 +74,7 @@ runs:
         # DEBUG 3: Ensure check run exists
         # -----------------------------
         - name: DEBUG — Validate Check Run Exists
-          uses: actions/github-script@v7
+          uses: actions/github-script@v8
           env:
               CHECK_RUN_ID: ${{ inputs.check-run-id }}
           with:
@@ -106,7 +106,7 @@ runs:
         # -----------------------------
         - name: Mark check as in_progress
           if: ${{ inputs.state == 'in_progress' }}
-          uses: actions/github-script@v7
+          uses: actions/github-script@v8
           env:
               CHECK_RUN_ID: ${{ inputs.check-run-id }}
           with:
@@ -117,7 +117,7 @@ runs:
 
         - name: Complete check
           if: ${{ inputs.state == 'completed' }}
-          uses: actions/github-script@v7
+          uses: actions/github-script@v8
           env:
               CHECK_RUN_ID: ${{ inputs.check-run-id }}
               PROJECT: ${{ inputs.project }}
