@@ -34,6 +34,11 @@ inputs:
         description: "NPM token for installing private dependencies"
         required: true
 
+    test-command:
+        description: "Command used to run E2E tests"
+        default: "pnpm run test:e2e"
+        required: false
+
 runs:
     using: composite
     steps:
@@ -104,7 +109,7 @@ runs:
           working-directory: apps/${{ inputs.project }}
           env:
               BASE_URL: ${{ inputs.preview-url }}
-          run: pnpm run test:e2e
+          run: ${{ inputs.test-command }}
 
         # -----------------------------------------------------
         # REPORT
