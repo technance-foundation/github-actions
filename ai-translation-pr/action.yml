@@ -116,15 +116,15 @@ outputs:
 
     changed-count:
         description: Number of projects that actually required generated translation changes
-        value: ${{ steps.checks.outputs.changed_count }}
+        value: ${{ steps.checks.outputs.changed_count || '0' }}
 
     changed-projects-json:
         description: JSON array of project keys with real translation changes
-        value: ${{ steps.checks.outputs.changed_projects_json }}
+        value: ${{ steps.checks.outputs.changed_projects_json || '[]' }}
 
     any-changes:
         description: Whether any project required generated translation changes
-        value: ${{ steps.checks.outputs.any_changes }}
+        value: ${{ steps.checks.outputs.any_changes || 'false' }}
 
 runs:
     using: composite
