@@ -45,15 +45,8 @@ project_key_for_path() {
     return
   fi
 
-  local base
-  base="$(basename "$project_path")"
-
-  if [ -n "$base" ] && [ "$base" != "." ] && [ "$base" != "/" ]; then
-    printf '%s\n' "$base"
-    return
-  fi
-
-  printf '%s\n' "$project_path" | sed 's#[/ ]#-#g'
+  project_path="${project_path%/}"
+  printf '%s\n' "$project_path" | sed 's#[/. ]#-#g'
 }
 
 project_label_for_key() {
