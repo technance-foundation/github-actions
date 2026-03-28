@@ -27,4 +27,7 @@ This repository contains reusable **composite GitHub Actions** maintained by Tec
 - [E2E Test Runner](e2e-test-runner/README.md)
   Full Playwright E2E test pipeline: installs deps, caches browsers, runs tests, uploads reports, and updates GitHub Check Runs. Replaces long multi-step workflows with one action. This E2E action relies on the external **Relay** service [^1].
 
+- [AI Translation PR](ai-translation-pr/README.md)
+  Maintains a deterministic Worphling-powered AI translation PR for monorepos or root projects. Detects affected projects, runs Worphling checks, syncs generated translations, and opens or updates a dedicated PR back into the source branch.
+
 [^1]: These E2E actions integrate with the external **Relay** service, which waits for preview deployments to become ready and then triggers the E2E workflow. Relay implementation: https://github.com/technance-foundation/vercel-to-github-relay See [RELAY.md](https://github.com/technance-foundation/github-actions/blob/main/RELAY.md) for a full explanation.

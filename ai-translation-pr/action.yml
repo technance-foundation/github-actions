@@ -1,0 +1,223 @@
+name: AI Translation PR
+description: Maintain a deterministic Worphling-powered AI translation branch and PR for monorepos or root projects.
+
+inputs:
+    github-token:
+        description: GitHub token used for PR and branch operations
+        required: true
+
+    npm-token:
+        description: NPM token used for dependency installation
+        required: false
+
+    openai-api-key:
+        description: OpenAI API key used by Worphling
+        required: true
+
+    pr-number:
+        description: Source pull request number
+        required: true
+
+    source-branch:
+        description: Source pull request head branch name
+        required: true
+
+    source-sha:
+        description: Source pull request head SHA
+        required: true
+
+    automation-branch:
+        description: Automation branch name used for the generated AI translation PR
+        required: true
+
+    labels:
+        description: Multiline list of labels to apply to the AI translation PR
+        required: false
+        default: |
+            automated
+            translations
+            worphling
+
+    node-version:
+        description: Node.js version
+        required: false
+        default: "22"
+
+    pnpm-version:
+        description: pnpm version
+        required: false
+        default: "10.15.0"
+
+    install-command:
+        description: Install command passed to shared setup action
+        required: false
+        default: "pnpm install --no-frozen-lockfile"
+
+    build-command:
+        description: Build command passed to shared setup action, or false
+        required: false
+        default: "false"
+
+    working-directory:
+        description: Working directory passed to shared setup action
+        required: false
+        default: "."
+
+    project-roots:
+        description: |
+            Multiline list of Worphling project roots.
+            Supports "." and shell globs like "apps/*" or "packages/*".
+        required: false
+        default: |
+            apps/*
+
+    artifact-root:
+        description: Root directory for generated Worphling reports
+        required: false
+        default: ".github-artifacts/worphling"
+
+    global-invalidation-paths:
+        description: Multiline list of repo-level paths that invalidate all Worphling projects
+        required: false
+        default: |
+            package.json
+            pnpm-lock.yaml
+
+    pr-title-template:
+        description: |
+            AI translation PR title template.
+
+            Use __PR_NUMBER__ as the placeholder.
+
+            Example:
+            Update AI translations for #__PR_NUMBER__
+        required: false
+        default: "Update AI translations for #__PR_NUMBER__"
+
+    pr-close-comment-template:
+        description: |
+            AI translation PR close comment template.
+
+            Use __PR_NUMBER__ as the placeholder.
+
+            Example:
+            Closing automatically because PR #__PR_NUMBER__ no longer requires generated AI translation updates.
+        required: false
+        default: "Closing automatically because PR #__PR_NUMBER__ no longer requires generated AI translation updates."
+
+outputs:
+    affected-count:
+        description: Number of affected Worphling-enabled projects
+        value: ${{ steps.detect.outputs.affected_count }}
+
+    affected-projects-json:
+        description: JSON array of affected Worphling-enabled project keys
+        value: ${{ steps.detect.outputs.affected_projects_json }}
+
+    changed-count:
+        description: Number of projects that actually required generated translation changes
+        value: ${{ steps.checks.outputs.changed_count }}
+
+    changed-projects-json:
+        description: JSON array of project keys with real translation changes
+        value: ${{ steps.checks.outputs.changed_projects_json }}
+
+    any-changes:
+        description: Whether any project required generated translation changes
+        value: ${{ steps.checks.outputs.any_changes }}
+
+runs:
+    using: composite
+    steps:
+        - name: Make action scripts executable
+          shell: bash
+          run: chmod +x "$GITHUB_ACTION_PATH"/*.sh
+
+        - name: Detect affected Worphling projects
+          id: detect
+          shell: bash
+          env:
+              GH_TOKEN: ${{ inputs.github-token }}
+              PR_NUMBER: ${{ inputs.pr-number }}
+              GITHUB_REPOSITORY: ${{ github.repository }}
+              PROJECT_ROOTS: ${{ inputs.project-roots }}
+              ARTIFACT_ROOT: ${{ inputs.artifact-root }}
+              GLOBAL_INVALIDATION_PATHS: ${{ inputs.global-invalidation-paths }}
+          run: "$GITHUB_ACTION_PATH/detect-affected-projects.sh"
+
+        - name: Cleanup stale AI translation PR and branch when no projects are affected
+          if: ${{ steps.detect.outputs.affected_count == '0' }}
+          shell: bash
+          env:
+              GH_TOKEN: ${{ inputs.github-token }}
+              PR_NUMBER: ${{ inputs.pr-number }}
+              AUTOMATION_BRANCH: ${{ inputs.automation-branch }}
+              GITHUB_REPOSITORY: ${{ github.repository }}
+              AI_TRANSLATION_PR_CLOSE_COMMENT_TEMPLATE: ${{ inputs.pr-close-comment-template }}
+          run: "$GITHUB_ACTION_PATH/cleanup-ai-translation-pr.sh"
+
+        - name: Setup repository
+          if: ${{ steps.detect.outputs.affected_count != '0' }}
+          uses: technance-foundation/github-actions/setup@v1
+          with:
+              node-version: ${{ inputs.node-version }}
+              pnpm-version: ${{ inputs.pnpm-version }}
+              npm-token: ${{ inputs.npm-token }}
+              pnpm-cache: "write"
+              install: ${{ inputs.install-command }}
+              build: ${{ inputs.build-command }}
+              working-directory: ${{ inputs.working-directory }}
+
+        - name: Run Worphling checks
+          if: ${{ steps.detect.outputs.affected_count != '0' }}
+          id: checks
+          shell: bash
+          env:
+              GITHUB_OUTPUT: ${{ github.output }}
+              PR_NUMBER: ${{ inputs.pr-number }}
+              SOURCE_BRANCH: ${{ inputs.source-branch }}
+              AUTOMATION_BRANCH: ${{ inputs.automation-branch }}
+              AFFECTED_PROJECTS_JSON: ${{ steps.detect.outputs.affected_projects_json }}
+              PROJECT_ROOTS: ${{ inputs.project-roots }}
+              ARTIFACT_ROOT: ${{ inputs.artifact-root }}
+              OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+          run: "$GITHUB_ACTION_PATH/run-checks.sh"
+
+        - name: Create or update AI translation branch and PR
+          if: ${{ steps.detect.outputs.affected_count != '0' && steps.checks.outputs.any_changes == 'true' }}
+          shell: bash
+          env:
+              GH_TOKEN: ${{ inputs.github-token }}
+              OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+              PR_NUMBER: ${{ inputs.pr-number }}
+              SOURCE_BRANCH: ${{ inputs.source-branch }}
+              SOURCE_SHA: ${{ inputs.source-sha }}
+              AUTOMATION_BRANCH: ${{ inputs.automation-branch }}
+              GITHUB_REPOSITORY: ${{ github.repository }}
+              CHANGED_PROJECTS_JSON: ${{ steps.checks.outputs.changed_projects_json }}
+              PR_BODY_FILE: ${{ steps.checks.outputs.pr_body_file }}
+              PROJECT_ROOTS: ${{ inputs.project-roots }}
+              ARTIFACT_ROOT: ${{ inputs.artifact-root }}
+              AI_TRANSLATION_PR_LABELS: ${{ inputs.labels }}
+              AI_TRANSLATION_PR_TITLE_TEMPLATE: ${{ inputs.pr-title-template }}
+          run: "$GITHUB_ACTION_PATH/sync-and-publish-ai-translation-pr.sh"
+
+        - name: Cleanup stale AI translation PR and branch when no translation changes remain
+          if: ${{ steps.detect.outputs.affected_count != '0' && steps.checks.outputs.any_changes == 'false' }}
+          shell: bash
+          env:
+              GH_TOKEN: ${{ inputs.github-token }}
+              PR_NUMBER: ${{ inputs.pr-number }}
+              AUTOMATION_BRANCH: ${{ inputs.automation-branch }}
+              GITHUB_REPOSITORY: ${{ github.repository }}
+              AI_TRANSLATION_PR_CLOSE_COMMENT_TEMPLATE: ${{ inputs.pr-close-comment-template }}
+          run: "$GITHUB_ACTION_PATH/cleanup-ai-translation-pr.sh"
+
+        - name: Upload Worphling reports
+          if: ${{ always() && steps.detect.outputs.affected_count != '0' }}
+          uses: actions/upload-artifact@v4
+          with:
+              name: worphling-ai-translation-pr-${{ inputs.pr-number }}-reports
+              path: ${{ inputs.artifact-root }}/
+              retention-days: 30
+              if-no-files-found: ignore
