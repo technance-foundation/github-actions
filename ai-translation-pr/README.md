@@ -24,6 +24,58 @@ This is useful for:
 - Root-level projects using `project-roots: "."`
 - Teams that want AI-generated translation changes reviewed separately
 
+## ⚠️ Required repository settings
+
+> [!IMPORTANT]  
+> This action creates and updates branches and pull requests using `github.token`.
+> By default, GitHub may block this unless repository permissions are configured correctly.
+
+You must enable the following settings in your repository:
+
+### 1. Allow GitHub Actions to create and approve pull requests
+
+Go to:
+
+**Settings → Actions → General → Workflow permissions**
+
+- Set **Workflow permissions** to:
+    - ✅ **Read and write permissions**
+
+- Enable:
+    - ✅ **Allow GitHub Actions to create and approve pull requests**
+
+### 2. Ensure workflow permissions include PR access
+
+Your workflow must include:
+
+```yaml
+permissions:
+    contents: write
+    pull-requests: write
+    issues: write
+```
+
+Without these permissions, the action will fail when trying to:
+
+- push the automation branch
+- create or update the translation PR
+- comment or close stale PRs
+
+### 3. (Optional) Branch protection rules
+
+If your repository uses branch protection:
+
+- Ensure the automation branch (e.g. `worphling/*`) is **not blocked**
+- Or allow GitHub Actions to bypass restrictions where appropriate
+
+---
+
+If these settings are not configured, the action may fail with errors like:
+
+- `Resource not accessible by integration`
+- `Permission denied to create pull request`
+- `Failed to push to branch`
+
 ## Inputs
 
 | Name                        | Required | Description                                                                           |

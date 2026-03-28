@@ -173,6 +173,7 @@ runs:
           id: checks
           shell: bash
           env:
+              GH_TOKEN: ${{ inputs.github-token }}
               PR_NUMBER: ${{ inputs.pr-number }}
               SOURCE_BRANCH: ${{ inputs.source-branch }}
               AUTOMATION_BRANCH: ${{ inputs.automation-branch }}
