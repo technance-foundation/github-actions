@@ -26,6 +26,8 @@ PR_TITLE_TEMPLATE="${AI_TRANSLATION_PR_TITLE_TEMPLATE:-Update AI translations fo
 
 mkdir -p "$REPORT_ROOT"
 
+repo_root="$(git rev-parse --show-toplevel)"
+
 render_template() {
   local template="$1"
   local pr_number="$2"
@@ -293,6 +295,8 @@ for project_key in "${changed_project_keys[@]}"; do
 
   sync_report="${project_report_dir}/sync-report.json"
   post_check_report="${project_report_dir}/post-check-report.json"
+  sync_report_abs="${repo_root}/${sync_report}"
+  post_check_report_abs="${repo_root}/${post_check_report}"
   project_label="$(project_label_for_key "$project_key")"
 
   echo "Running worphling sync for ${project_label}"
@@ -302,14 +306,17 @@ for project_key in "${changed_project_keys[@]}"; do
     OPENAI_API_KEY="$OPENAI_API_KEY" pnpm exec worphling sync \
       --write \
       --config "$config_name" \
-      --report-file "../../${sync_report}"
+      --report-file "$sync_report_abs"
   )
   sync_exit_code=$?
   set -e
 
   if [ ! -s "$sync_report" ]; then
     echo "worphling sync did not produce a readable report for ${project_label} (exit code ${sync_exit_code})" >&2
-    exit "$sync_exit_code"
+    if [ "$sync_exit_code" -ne 0 ]; then
+      exit "$sync_exit_code"
+    fi
+    exit 1
   fi
 
   echo "worphling sync exit code for ${project_label}: ${sync_exit_code}"
@@ -321,14 +328,17 @@ for project_key in "${changed_project_keys[@]}"; do
     OPENAI_API_KEY="$OPENAI_API_KEY" pnpm exec worphling check \
       --ci \
       --config "$config_name" \
-      --report-file "../../${post_check_report}"
+      --report-file "$post_check_report_abs"
   )
   exit_code=$?
   set -e
 
   if [ ! -s "$post_check_report" ]; then
     echo "Post-sync worphling check did not produce a readable report for ${project_label} (exit code ${exit_code})" >&2
-    exit "$exit_code"
+    if [ "$exit_code" -ne 0 ]; then
+      exit "$exit_code"
+    fi
+    exit 1
   fi
 
   if ! jq -e '.summary.hasChanges != null' "$post_check_report" >/dev/null 2>&1; then

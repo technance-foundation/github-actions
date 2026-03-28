@@ -17,6 +17,8 @@ REPORT_ROOT="${ARTIFACT_ROOT:-.github-artifacts/worphling}"
 
 mkdir -p "$REPORT_ROOT"
 
+repo_root="$(git rev-parse --show-toplevel)"
+
 find_project_config() {
   local project_dir="$1"
   find "$project_dir" -maxdepth 1 -type f \
@@ -146,7 +148,6 @@ pr_body_file="${REPORT_ROOT}/ai-translation-pr-body.md"
   echo "This PR is automatically maintained by the AI translation workflow."
   echo
   echo "It contains generated translation updates for source PR #${PR_NUMBER}."
-  echo
   echo "## Overview"
   echo
   echo "- **Source PR**: #${PR_NUMBER}"
@@ -180,6 +181,7 @@ for project_key in "${project_keys[@]}"; do
   mkdir -p "$project_report_dir"
 
   check_report="${project_report_dir}/check-report.json"
+  check_report_abs="${repo_root}/${check_report}"
   project_label="$(project_label_for_key "$project_key")"
 
   echo "Running worphling check for ${project_label}"
@@ -189,14 +191,17 @@ for project_key in "${project_keys[@]}"; do
     cd "$project_dir"
     OPENAI_API_KEY="${OPENAI_API_KEY:-}" pnpm exec worphling check \
       --config "$config_name" \
-      --report-file "../../${check_report}"
+      --report-file "$check_report_abs"
   )
   exit_code=$?
   set -e
 
   if [ ! -s "$check_report" ]; then
     echo "worphling check did not produce a readable report for ${project_label} (exit code ${exit_code})" >&2
-    exit "$exit_code"
+    if [ "$exit_code" -ne 0 ]; then
+      exit "$exit_code"
+    fi
+    exit 1
   fi
 
   if ! jq -e '.summary.hasChanges != null' "$check_report" >/dev/null 2>&1; then
