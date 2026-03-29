@@ -33,10 +33,6 @@ inputs:
     labels:
         description: Multiline list of labels to apply to the AI translation PR
         required: false
-        default: |
-            automated
-            translations
-            worphling
 
     node-version:
         description: Node.js version
