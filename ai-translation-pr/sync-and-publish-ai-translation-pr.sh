@@ -157,6 +157,27 @@ extract_modified() {
   '
 }
 
+extract_error_issue_count() {
+  local file="$1"
+  jq -r '[.issues[]? | select(.severity == "error")] | length' "$file" 2>/dev/null || echo "0"
+}
+
+extract_warning_issue_count() {
+  local file="$1"
+  jq -r '[.issues[]? | select(.severity == "warning")] | length' "$file" 2>/dev/null || echo "0"
+}
+
+write_error_issue_bullets() {
+  local file="$1"
+  local output_file="$2"
+
+  jq -r '
+    [.issues[]? | select(.severity == "error")][0:10]
+    | .[]
+    | "- `" + .key + "` -- " + .type + ": " + .message
+  ' "$file" > "$output_file" 2>/dev/null || : > "$output_file"
+}
+
 count_staged_files_for_project() {
   local project_dir="$1"
   local count="0"
@@ -242,7 +263,7 @@ replace_post_sync_section() {
   } > "$body_file"
 }
 
-mapfile -t changed_project_keys < <(jq -r '.[]' <<<"$CHANGED_PROJECTS_JSON")
+mapfile -t changed_project_keys < <(jq -r '.[]' <<< "$CHANGED_PROJECTS_JSON")
 
 if [ "${#changed_project_keys[@]}" -eq 0 ]; then
   echo "No changed projects provided. Nothing to sync."
@@ -264,11 +285,14 @@ mkdir -p "$REPORT_ROOT"
 post_sync_summary_file="$(mktemp)"
 project_cards_file="$(mktemp)"
 
+overall_verification_failed="false"
+overall_sync_failed="false"
+any_generated_changes="false"
+
 {
   echo "## ✨ Post-sync summary"
   echo
-  echo "Generated translations were applied successfully."
-  echo
+  echo "Generated translation updates were applied where possible. Verification results are shown below."
   echo
   echo "| Project | Result | Files changed | Remaining issues |"
   echo "| --- | --- | ---: | --- |"
@@ -279,14 +303,16 @@ for project_key in "${changed_project_keys[@]}"; do
 
   if [ -z "$project_dir" ]; then
     echo "No project directory found for key ${project_key}" >&2
-    exit 1
+    overall_sync_failed="true"
+    continue
   fi
 
   config_file="$(find_project_config "$project_dir")"
 
   if [ -z "$config_file" ]; then
     echo "No Worphling config found for ${project_dir}" >&2
-    exit 1
+    overall_sync_failed="true"
+    continue
   fi
 
   config_name="$(basename "$config_file")"
@@ -313,47 +339,83 @@ for project_key in "${changed_project_keys[@]}"; do
 
   if [ ! -s "$sync_report" ]; then
     echo "worphling sync did not produce a readable report for ${project_label} (exit code ${sync_exit_code})" >&2
-    if [ "$sync_exit_code" -ne 0 ]; then
-      exit "$sync_exit_code"
-    fi
-    exit 1
+    overall_sync_failed="true"
+
+    echo "| \`${project_label}\` | ❌ Sync failed | 0 | sync failed before a readable report was produced |" >> "$post_sync_summary_file"
+
+    {
+      echo
+      echo "<details>"
+      echo "<summary><strong>📌 ${project_label}</strong></summary>"
+      echo
+      echo "- **Result**: ❌ Sync failed"
+      echo "- **Sync exit code**: ${sync_exit_code}"
+      echo "- **Files changed**: 0"
+      echo "- **Reason**: Worphling sync did not produce a readable report."
+      echo
+      echo "</details>"
+    } >> "$project_cards_file"
+
+    continue
   fi
 
   echo "worphling sync exit code for ${project_label}: ${sync_exit_code}"
 
-  echo "Running post-sync CI check for ${project_label}"
+  echo "Running post-sync verification for ${project_label}"
   set +e
   (
     cd "$project_dir"
     OPENAI_API_KEY="$OPENAI_API_KEY" pnpm exec worphling check \
-      --ci \
       --config "$config_name" \
       --report-file "$post_check_report_abs"
   )
-  exit_code=$?
+  post_check_exit_code=$?
   set -e
 
   if [ ! -s "$post_check_report" ]; then
-    echo "Post-sync worphling check did not produce a readable report for ${project_label} (exit code ${exit_code})" >&2
-    if [ "$exit_code" -ne 0 ]; then
-      exit "$exit_code"
+    echo "Post-sync worphling check did not produce a readable report for ${project_label} (exit code ${post_check_exit_code})" >&2
+    overall_verification_failed="true"
+
+    if [ -d "${project_dir}/locales" ]; then
+      git add --all -- "${project_dir}/locales"
     fi
-    exit 1
+
+    if [ -d "${project_dir}/.worphling" ]; then
+      git add --all -- "${project_dir}/.worphling"
+    fi
+
+    staged_files_count="$(count_staged_files_for_project "$project_dir")"
+
+    if [ "$staged_files_count" -gt 0 ]; then
+      any_generated_changes="true"
+    fi
+
+    echo "| \`${project_label}\` | ⚠️ Synced but verification failed | ${staged_files_count} | post-sync check failed before a readable report was produced |" >> "$post_sync_summary_file"
+
+    {
+      echo
+      echo "<details>"
+      echo "<summary><strong>📌 ${project_label}</strong></summary>"
+      echo
+      echo "- **Result**: ⚠️ Synced but verification failed"
+      echo "- **Sync exit code**: ${sync_exit_code}"
+      echo "- **Post-sync check exit code**: ${post_check_exit_code}"
+      echo "- **Files changed**: ${staged_files_count}"
+      echo "- **Reason**: Post-sync verification did not produce a readable report."
+      echo
+      echo "</details>"
+    } >> "$project_cards_file"
+
+    continue
   fi
 
   if ! jq -e '.summary.hasChanges != null' "$post_check_report" >/dev/null 2>&1; then
     echo "Post-sync report for ${project_label} is missing summary.hasChanges" >&2
     cat "$post_check_report" >&2 || true
-    exit 1
+    overall_verification_failed="true"
   fi
 
-  echo "Post-sync worphling check exit code for ${project_label}: ${exit_code}"
-
-  has_changes="$(jq -r '.summary.hasChanges // false' "$post_check_report")"
-  if [ "$has_changes" != "false" ]; then
-    echo "Post-sync CI verification still reports changes for ${project_label}" >&2
-    exit 1
-  fi
+  echo "Post-sync worphling check exit code for ${project_label}: ${post_check_exit_code}"
 
   if [ -d "${project_dir}/locales" ]; then
     git add --all -- "${project_dir}/locales"
@@ -364,28 +426,69 @@ for project_key in "${changed_project_keys[@]}"; do
   fi
 
   staged_files_count="$(count_staged_files_for_project "$project_dir")"
+
+  if [ "$staged_files_count" -gt 0 ]; then
+    any_generated_changes="true"
+  fi
+
+  has_changes="$(jq -r '.summary.hasChanges // false' "$post_check_report")"
   remaining_missing="$(extract_missing "$post_check_report")"
   remaining_extra="$(extract_extra "$post_check_report")"
   remaining_modified="$(extract_modified "$post_check_report")"
+  error_issue_count="$(extract_error_issue_count "$post_check_report")"
+  warning_issue_count="$(extract_warning_issue_count "$post_check_report")"
 
-  echo "| \`${project_label}\` | ✅ Synced | ${staged_files_count} | missing: ${remaining_missing}, extra: ${remaining_extra}, modified: ${remaining_modified} |" >> "$post_sync_summary_file"
+  issue_summary="errors: ${error_issue_count}, warnings: ${warning_issue_count}, missing: ${remaining_missing}, extra: ${remaining_extra}, modified: ${remaining_modified}"
+
+  result_label="✅ Synced and verified"
+  result_description="✅ Synced successfully"
+
+  if [ "$post_check_exit_code" -ne 0 ] || [ "$has_changes" != "false" ] || [ "$error_issue_count" -gt 0 ]; then
+    overall_verification_failed="true"
+    result_label="⚠️ Synced with verification issues"
+    result_description="⚠️ Synced with verification issues"
+  fi
+
+  echo "| \`${project_label}\` | ${result_label} | ${staged_files_count} | ${issue_summary} |" >> "$post_sync_summary_file"
 
   {
     echo
     echo "<details>"
     echo "<summary><strong>📌 ${project_label}</strong></summary>"
     echo
-    echo "- **Result**: ✅ Synced successfully"
+    echo "- **Result**: ${result_description}"
+    echo "- **Sync exit code**: ${sync_exit_code}"
+    echo "- **Post-sync check exit code**: ${post_check_exit_code}"
     echo "- **Files changed**: ${staged_files_count}"
+    echo "- **Remaining errors**: ${error_issue_count}"
+    echo "- **Remaining warnings**: ${warning_issue_count}"
     echo "- **Remaining missing**: ${remaining_missing}"
     echo "- **Remaining extra**: ${remaining_extra}"
     echo "- **Remaining modified**: ${remaining_modified}"
+    echo "- **Has remaining changes**: ${has_changes}"
     echo
+
+    if [ "$error_issue_count" -gt 0 ]; then
+      error_issue_bullets_file="$(mktemp)"
+      write_error_issue_bullets "$post_check_report" "$error_issue_bullets_file"
+
+      echo "### Remaining error issues"
+      echo
+      if [ -s "$error_issue_bullets_file" ]; then
+        cat "$error_issue_bullets_file"
+      else
+        echo "- Error issues remain, but they could not be rendered."
+      fi
+      echo
+
+      rm -f "$error_issue_bullets_file"
+    fi
+
     echo "</details>"
   } >> "$project_cards_file"
 done
 
-if git diff --cached --quiet; then
+if [ "$any_generated_changes" != "true" ] && git diff --cached --quiet; then
   echo "Worphling reported changes but no generated files were staged." >&2
   exit 1
 fi
@@ -398,9 +501,12 @@ post_sync_combined_file="$(mktemp)"
 
 replace_post_sync_section "$temp_pr_body" "$post_sync_combined_file"
 
-git commit -m "Update AI translations for #${PR_NUMBER}"
-
-git push --force-with-lease origin "HEAD:refs/heads/${AUTOMATION_BRANCH}"
+if ! git diff --cached --quiet; then
+  git commit -m "Update AI translations for #${PR_NUMBER}"
+  git push --force-with-lease origin "HEAD:refs/heads/${AUTOMATION_BRANCH}"
+else
+  echo "No staged file changes were produced, but PR body will still reflect verification results."
+fi
 
 open_pr_number="$(find_open_pr_number)"
 
@@ -413,12 +519,9 @@ if [ -n "$open_pr_number" ]; then
   apply_labels_to_pr "$open_pr_number"
 
   echo "Updated existing AI translation PR #${open_pr_number}"
-  exit 0
-fi
+elif [ -n "$(find_closed_unmerged_pr_number)" ]; then
+  closed_unmerged_pr_number="$(find_closed_unmerged_pr_number)"
 
-closed_unmerged_pr_number="$(find_closed_unmerged_pr_number)"
-
-if [ -n "$closed_unmerged_pr_number" ]; then
   gh pr reopen "$closed_unmerged_pr_number" --repo "$GITHUB_REPOSITORY"
 
   gh pr edit "$closed_unmerged_pr_number" \
@@ -429,28 +532,38 @@ if [ -n "$closed_unmerged_pr_number" ]; then
   apply_labels_to_pr "$closed_unmerged_pr_number"
 
   echo "Reopened and updated AI translation PR #${closed_unmerged_pr_number}"
-  exit 0
+else
+  set +e
+  gh pr create \
+    --repo "$GITHUB_REPOSITORY" \
+    --base "$SOURCE_BRANCH" \
+    --head "$AUTOMATION_BRANCH" \
+    --title "$pr_title" \
+    --body-file "$temp_pr_body"
+  create_exit_code=$?
+  set -e
+
+  new_pr_number="$(find_open_pr_number)"
+
+  if [ -z "$new_pr_number" ] && [ "$create_exit_code" -ne 0 ]; then
+    echo "Failed to create AI translation PR and no existing PR was found." >&2
+    exit "$create_exit_code"
+  fi
+
+  if [ -n "$new_pr_number" ]; then
+    apply_labels_to_pr "$new_pr_number"
+    echo "AI translation PR is available as #${new_pr_number}"
+  fi
 fi
 
-set +e
-gh pr create \
-  --repo "$GITHUB_REPOSITORY" \
-  --base "$SOURCE_BRANCH" \
-  --head "$AUTOMATION_BRANCH" \
-  --title "$pr_title" \
-  --body-file "$temp_pr_body"
-create_exit_code=$?
-set -e
-
-new_pr_number="$(find_open_pr_number)"
-
-if [ -z "$new_pr_number" ] && [ "$create_exit_code" -ne 0 ]; then
-  echo "Failed to create AI translation PR and no existing PR was found." >&2
-  exit "$create_exit_code"
+if [ "$overall_sync_failed" = "true" ]; then
+  echo "One or more projects failed during sync. PR was still published when possible." >&2
+  exit 1
 fi
 
-if [ -n "$new_pr_number" ]; then
-  apply_labels_to_pr "$new_pr_number"
-  echo "AI translation PR is available as #${new_pr_number}"
-  exit 0
+if [ "$overall_verification_failed" = "true" ]; then
+  echo "One or more projects were synced, but post-sync verification still has issues. PR was published with failure details." >&2
+  exit 1
 fi
+
+exit 0
