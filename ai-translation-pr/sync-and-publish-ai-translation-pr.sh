@@ -109,6 +109,46 @@ expand_project_roots() {
   done <<< "$PROJECT_ROOTS_RAW"
 }
 
+stage_project_outputs_from_report() {
+  local report_file="$1"
+  local any_paths="false"
+
+  if [ ! -s "$report_file" ]; then
+    echo "Cannot stage outputs because report file is missing: ${report_file}" >&2
+    return 1
+  fi
+
+  if ! jq -e '.outputs != null' "$report_file" >/dev/null 2>&1; then
+    echo "Cannot stage outputs because report is missing .outputs: ${report_file}" >&2
+    return 1
+  fi
+
+  while IFS= read -r output_path; do
+    [ -z "$output_path" ] && continue
+    any_paths="true"
+
+    echo "Staging reported output: ${output_path}"
+
+    if [ -e "$output_path" ]; then
+      git add --all -- "$output_path"
+    else
+      echo "Reported output path does not exist on disk: ${output_path}" >&2
+    fi
+  done < <(
+    jq -r '
+      [
+        (.outputs.writtenLocaleFiles[]?),
+        (.outputs.writtenSnapshotFile // empty)
+      ]
+      | .[]
+    ' "$report_file"
+  )
+
+  if [ "$any_paths" != "true" ]; then
+    echo "Report contains no written output paths: ${report_file}" >&2
+  fi
+}
+
 declare -A project_path_by_key=()
 
 while IFS= read -r project_path; do
@@ -361,6 +401,16 @@ for project_key in "${changed_project_keys[@]}"; do
 
   echo "worphling sync exit code for ${project_label}: ${sync_exit_code}"
 
+  if ! jq -e '.summary != null' "$sync_report" >/dev/null 2>&1; then
+    echo "Sync report for ${project_label} is missing .summary" >&2
+    overall_sync_failed="true"
+  fi
+
+  if ! jq -e '.outputs != null' "$sync_report" >/dev/null 2>&1; then
+    echo "Sync report for ${project_label} is missing .outputs" >&2
+    overall_sync_failed="true"
+  fi
+
   echo "Running post-sync verification for ${project_label}"
   set +e
   (
@@ -376,13 +426,7 @@ for project_key in "${changed_project_keys[@]}"; do
     echo "Post-sync worphling check did not produce a readable report for ${project_label} (exit code ${post_check_exit_code})" >&2
     overall_verification_failed="true"
 
-    if [ -d "${project_dir}/locales" ]; then
-      git add --all -- "${project_dir}/locales"
-    fi
-
-    if [ -d "${project_dir}/.worphling" ]; then
-      git add --all -- "${project_dir}/.worphling"
-    fi
+    stage_project_outputs_from_report "$sync_report"
 
     staged_files_count="$(count_staged_files_for_project "$project_dir")"
 
@@ -417,13 +461,7 @@ for project_key in "${changed_project_keys[@]}"; do
 
   echo "Post-sync worphling check exit code for ${project_label}: ${post_check_exit_code}"
 
-  if [ -d "${project_dir}/locales" ]; then
-    git add --all -- "${project_dir}/locales"
-  fi
-
-  if [ -d "${project_dir}/.worphling" ]; then
-    git add --all -- "${project_dir}/.worphling"
-  fi
+  stage_project_outputs_from_report "$sync_report"
 
   staged_files_count="$(count_staged_files_for_project "$project_dir")"
 
