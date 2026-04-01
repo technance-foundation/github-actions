@@ -109,8 +109,30 @@ expand_project_roots() {
   done <<< "$PROJECT_ROOTS_RAW"
 }
 
+resolve_report_output_path() {
+  local project_dir="$1"
+  local output_path="$2"
+
+  if [ -z "$output_path" ]; then
+    return
+  fi
+
+  case "$output_path" in
+    /*)
+      printf '%s\n' "$output_path"
+      ;;
+    *)
+      (
+        cd "$project_dir"
+        python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$output_path"
+      )
+      ;;
+  esac
+}
+
 stage_project_outputs_from_report() {
-  local report_file="$1"
+  local project_dir="$1"
+  local report_file="$2"
   local any_paths="false"
 
   if [ ! -s "$report_file" ]; then
@@ -124,15 +146,19 @@ stage_project_outputs_from_report() {
   fi
 
   while IFS= read -r output_path; do
+    local resolved_path
+
     [ -z "$output_path" ] && continue
     any_paths="true"
+    resolved_path="$(resolve_report_output_path "$project_dir" "$output_path")"
 
     echo "Staging reported output: ${output_path}"
+    echo "Resolved reported output: ${resolved_path}"
 
-    if [ -e "$output_path" ]; then
-      git add --all -- "$output_path"
+    if [ -e "$resolved_path" ]; then
+      git add --all -- "$resolved_path"
     else
-      echo "Reported output path does not exist on disk: ${output_path}" >&2
+      echo "Reported output path does not exist on disk: ${resolved_path}" >&2
     fi
   done < <(
     jq -r '
@@ -426,7 +452,7 @@ for project_key in "${changed_project_keys[@]}"; do
     echo "Post-sync worphling check did not produce a readable report for ${project_label} (exit code ${post_check_exit_code})" >&2
     overall_verification_failed="true"
 
-    stage_project_outputs_from_report "$sync_report"
+    stage_project_outputs_from_report "$project_dir" "$sync_report"
 
     staged_files_count="$(count_staged_files_for_project "$project_dir")"
 
@@ -461,7 +487,7 @@ for project_key in "${changed_project_keys[@]}"; do
 
   echo "Post-sync worphling check exit code for ${project_label}: ${post_check_exit_code}"
 
-  stage_project_outputs_from_report "$sync_report"
+  stage_project_outputs_from_report "$project_dir" "$sync_report"
 
   staged_files_count="$(count_staged_files_for_project "$project_dir")"
 
