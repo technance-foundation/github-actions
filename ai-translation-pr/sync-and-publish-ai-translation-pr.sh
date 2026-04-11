@@ -566,7 +566,7 @@ post_sync_combined_file="$(mktemp)"
 replace_post_sync_section "$temp_pr_body" "$post_sync_combined_file"
 
 if ! git diff --cached --quiet; then
-  git commit -m "Update AI translations for #${PR_NUMBER}"
+  git commit -m "Update AI translations"
   git push --force-with-lease origin "HEAD:refs/heads/${AUTOMATION_BRANCH}"
 else
   echo "No staged file changes were produced, but PR body will still reflect verification results."
