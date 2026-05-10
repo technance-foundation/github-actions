@@ -131,12 +131,15 @@ runs:
           working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || format('apps/{0}', inputs.project) }}
           env:
               BASE_URL: ${{ inputs.preview-url }}
+              SHARD_INDEX: ${{ inputs.shard-index }}
+              SHARD_TOTAL: ${{ inputs.shard-total }}
+              TEST_COMMAND: ${{ inputs.test-command }}
           run: |
-              if [ -n "${{ inputs.shard-index }}" ] && [ -n "${{ inputs.shard-total }}" ]; then
-                  echo "Running shard ${{ inputs.shard-index }}/${{ inputs.shard-total }}"
-                  ${{ inputs.test-command }} -- --shard=${{ inputs.shard-index }}/${{ inputs.shard-total }}
+              if [ -n "$SHARD_INDEX" ] && [ -n "$SHARD_TOTAL" ]; then
+                  echo "Running shard $SHARD_INDEX/$SHARD_TOTAL"
+                  eval "$TEST_COMMAND" -- --shard="$SHARD_INDEX/$SHARD_TOTAL"
               else
-                  ${{ inputs.test-command }}
+                  eval "$TEST_COMMAND"
               fi
 
         # -----------------------------------------------------
@@ -145,7 +148,7 @@ runs:
         # -----------------------------------------------------
         - name: Upload Playwright blob report (sharded)
           id: upload-blob-report
-          if: always() && inputs.shard-index != ''
+          if: always() && inputs.shard-index != '' && inputs.shard-total != ''
           uses: actions/upload-artifact@v4
           with:
               name: ${{ inputs.project }}-playwright-blob-report-${{ inputs.shard-index }}
@@ -155,7 +158,7 @@ runs:
 
         - name: Upload Playwright report (un-sharded)
           id: upload-report
-          if: always() && inputs.shard-index == ''
+          if: always() && (inputs.shard-index == '' || inputs.shard-total == '')
           uses: actions/upload-artifact@v4
           with:
               name: ${{ inputs.project }}-playwright-report
