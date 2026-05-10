@@ -42,6 +42,21 @@ inputs:
     working-directory:
         description: "Working directory where E2E tests should run"
         required: false
+
+    shard-index:
+        description: "1-based shard index when running Playwright in shard mode. When set together with shard-total, the runner appends `--shard=<index>/<total>` to the test command and uploads a Playwright blob report instead of an html report."
+        required: false
+        default: ""
+
+    shard-total:
+        description: "Total number of shards when running Playwright in shard mode."
+        required: false
+        default: ""
+
+    skip-check-completion:
+        description: "If 'true', the runner does not mark the GitHub check as completed at the end of the job. Use this when a downstream merge job is responsible for completing the check (e.g. after merging blob reports from multiple shards)."
+        required: false
+        default: "false"
 runs:
     using: composite
     steps:
@@ -63,6 +78,10 @@ runs:
         # -----------------------------------------------------
         # MARK CHECK AS IN_PROGRESS
         # -----------------------------------------------------
+        # Note: when sharded, every shard hits this with the same check
+        # run id and state=in_progress. PATCH /check-runs is idempotent
+        # for repeated identical state transitions, so the redundant
+        # calls are safe.
         - name: Mark check as in_progress
           id: mark-in-progress
           uses: technance-foundation/github-actions/e2e-check@v1
@@ -112,14 +131,34 @@ runs:
           working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || format('apps/{0}', inputs.project) }}
           env:
               BASE_URL: ${{ inputs.preview-url }}
-          run: ${{ inputs.test-command }}
+              SHARD_INDEX: ${{ inputs.shard-index }}
+              SHARD_TOTAL: ${{ inputs.shard-total }}
+              TEST_COMMAND: ${{ inputs.test-command }}
+          run: |
+              if [ -n "$SHARD_INDEX" ] && [ -n "$SHARD_TOTAL" ]; then
+                  echo "Running shard $SHARD_INDEX/$SHARD_TOTAL"
+                  eval "$TEST_COMMAND" -- --shard="$SHARD_INDEX/$SHARD_TOTAL"
+              else
+                  eval "$TEST_COMMAND"
+              fi
 
         # -----------------------------------------------------
-        # REPORT
+        # REPORT (sharded path uploads a blob report; un-sharded
+        # path keeps the legacy html report)
         # -----------------------------------------------------
-        - name: Upload Playwright report
+        - name: Upload Playwright blob report (sharded)
+          id: upload-blob-report
+          if: always() && inputs.shard-index != '' && inputs.shard-total != ''
+          uses: actions/upload-artifact@v4
+          with:
+              name: ${{ inputs.project }}-playwright-blob-report-${{ inputs.shard-index }}
+              path: ${{ inputs.working-directory != '' && format('{0}/blob-report/', inputs.working-directory) || format('apps/{0}/blob-report/', inputs.project) }}
+              retention-days: 7
+              if-no-files-found: error
+
+        - name: Upload Playwright report (un-sharded)
           id: upload-report
-          if: always()
+          if: always() && (inputs.shard-index == '' || inputs.shard-total == '')
           uses: actions/upload-artifact@v4
           with:
               name: ${{ inputs.project }}-playwright-report
@@ -127,15 +166,16 @@ runs:
               retention-days: 30
 
         # -----------------------------------------------------
-        # COMPLETE CHECK
+        # COMPLETE CHECK (skipped when a downstream merge job
+        # owns the final check completion)
         # -----------------------------------------------------
         - name: Complete check
-          if: always()
+          if: always() && inputs.skip-check-completion != 'true'
           uses: technance-foundation/github-actions/e2e-check@v1
           with:
               token: ${{ inputs.token }}
               check-run-id: ${{ inputs.check-run-id }}
               state: completed
-              job-status: ${{ (steps.checkout-action.outcome == 'success' && steps.mark-in-progress.outcome == 'success' && steps.setup.outcome == 'success' && steps.cache-playwright.outcome == 'success' && (steps.pw-install.outcome == 'success' || steps.pw-install.outcome == 'skipped') && steps.e2e.outcome == 'success' && steps.upload-report.outcome == 'success') && 'success' || 'failure' }}
+              job-status: ${{ (steps.checkout-action.outcome == 'success' && steps.mark-in-progress.outcome == 'success' && steps.setup.outcome == 'success' && steps.cache-playwright.outcome == 'success' && (steps.pw-install.outcome == 'success' || steps.pw-install.outcome == 'skipped') && steps.e2e.outcome == 'success' && (steps.upload-report.outcome == 'success' || steps.upload-report.outcome == 'skipped') && (steps.upload-blob-report.outcome == 'success' || steps.upload-blob-report.outcome == 'skipped')) && 'success' || 'failure' }}
               project: ${{ inputs.project }}
               preview-url: ${{ inputs.preview-url }}
