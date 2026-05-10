@@ -142,8 +142,8 @@ Sharded mode partitions a single Playwright suite across N independent CI runner
 
 ### When to opt in
 
-- Your Playwright config is **shard-aware** — any per-worker resource (a backend account pool, fixtures stored under `tests/.auth/<n>.json`, etc.) must use a global slot like `(shard-1) * workersPerShard + parallelIndex` so two shards can't alias the same resource. The midnight app does this in [`apps/midnight/tests/e2e/lib/auth/trade-account-pool.ts`](https://github.com/technance-foundation/technance-platform-frontend/blob/main/apps/midnight/tests/e2e/lib/auth/trade-account-pool.ts).
-- Your `test-command` propagates extra args to Playwright. The action appends `-- --shard=<index>/<total>` after `inputs.test-command`, so a wrapper script (e.g. `node scripts/run-e2e-tests.js <app>`) must forward `process.argv.slice(3)` to `playwright test`. Otherwise `--shard` is silently dropped and every shard runs the full suite.
+- Your Playwright config is **shard-aware** — any per-worker resource (a backend account pool, fixtures stored under `tests/.auth/<n>.json`, etc.) must use a global slot like `(shardIndex - 1) * workersPerShard + parallelIndex` so two shards can't alias the same resource. The action exports `PLAYWRIGHT_SHARD_INDEX` and `PLAYWRIGHT_SHARD_TOTAL` from the matching workflow env so the config can read them at module load.
+- Your `test-command` propagates extra args to Playwright. The action appends `-- --shard=<index>/<total>` after `inputs.test-command`, so any wrapper script the caller invokes (e.g. a `node scripts/run-e2e.js <app>` shim that ultimately spawns `playwright test`) must forward its trailing argv to Playwright. Otherwise `--shard` is silently dropped and every shard runs the full suite.
 - Your test count is non-trivial (rough rule of thumb: > ~5 minutes per single-runner run). Below that the sharding overhead (4× setup, install, browser cache restore) dwarfs the savings.
 
 If any of those isn't true, leave `shard-index`/`shard-total` unset and the action runs in its single-runner mode unchanged.
