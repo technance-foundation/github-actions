@@ -130,6 +130,11 @@ runs:
                 echo "If you're using a self-hosted runner, install jq (and ensure bash is available)."
                 exit 1
               fi
+              if ! command -v gh >/dev/null 2>&1; then
+                echo "gh (GitHub CLI) is required but was not found on PATH."
+                echo "If you're using a self-hosted runner, install gh from https://cli.github.com/."
+                exit 1
+              fi
 
         - name: Authenticate NPM registry (optional)
           if: ${{ inputs.npm-token != '' }}
