@@ -58,6 +58,16 @@ inputs:
         description: "If 'true', the runner does not mark the GitHub check as completed at the end of the job. Use this when a downstream merge job is responsible for completing the check (e.g. after merging blob reports from multiple shards)."
         required: false
         default: "false"
+
+    pnpm-cache:
+        description: "pnpm-store cache strategy. `write` (default) restores and saves; `read` restores only — set this on shards that follow an `e2e-bootstrap` job so they don't waste post-job time re-tarring the same store; `off` disables the cache entirely."
+        required: false
+        default: "write"
+
+    playwright-cache:
+        description: "Playwright browser cache strategy. `write` (default) restores and saves; `read` restores only — set this on shards that follow an `e2e-bootstrap` job so they don't waste post-job time re-tarring the browser cache."
+        required: false
+        default: "write"
 runs:
     using: composite
     steps:
@@ -101,21 +111,51 @@ runs:
               node-version: ${{ inputs.node-version }}
               pnpm-version: ${{ inputs.pnpm-version }}
               npm-token: ${{ inputs.npm-token }}
-              pnpm-cache: "write"
+              pnpm-cache: ${{ inputs.pnpm-cache }}
               install: "pnpm install --no-frozen-lockfile"
               build: "false"
 
         # -----------------------------------------------------
         # BROWSER CACHING
         # -----------------------------------------------------
-        - name: Cache Playwright browsers
-          id: cache-playwright
+        # Two conditional cache steps: `actions/cache@v5` (read +
+        # write — default) vs `actions/cache/restore@v4` (read
+        # only). The downstream `cache-playwright` step normalizes
+        # the `cache-hit` output so the install-on-miss step and
+        # the final `Complete check` job-status expression don't
+        # need to branch on which one ran.
+        - name: Cache Playwright browsers (read + write)
+          id: cache-playwright-rw
+          if: inputs.playwright-cache != 'read'
           uses: actions/cache@v5
           with:
               path: ~/.cache/ms-playwright
               key: ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-${{ hashFiles('**/pnpm-lock.yaml') }}
               restore-keys: |
                   ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-
+
+        - name: Cache Playwright browsers (restore only)
+          id: cache-playwright-ro
+          if: inputs.playwright-cache == 'read'
+          uses: actions/cache/restore@v4
+          with:
+              path: ~/.cache/ms-playwright
+              key: ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+              restore-keys: |
+                  ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-
+
+        - name: Normalize Playwright cache-hit
+          id: cache-playwright
+          shell: bash
+          env:
+              HIT_RW: ${{ steps.cache-playwright-rw.outputs.cache-hit }}
+              HIT_RO: ${{ steps.cache-playwright-ro.outputs.cache-hit }}
+          run: |
+              if [ "$HIT_RW" = "true" ] || [ "$HIT_RO" = "true" ]; then
+                  echo "cache-hit=true" >> "$GITHUB_OUTPUT"
+              else
+                  echo "cache-hit=false" >> "$GITHUB_OUTPUT"
+              fi
 
         - name: Install Playwright deps + browsers (cache miss)
           id: pw-install
