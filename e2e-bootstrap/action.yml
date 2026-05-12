@@ -1,0 +1,61 @@
+name: "E2E Test Bootstrap"
+description: "Primes the pnpm store cache and the Playwright browser cache exactly once so downstream matrix-sharded test jobs start against warm caches instead of all racing a cold cache miss in parallel."
+
+inputs:
+    node-version:
+        description: "Node.js version"
+        default: "22"
+
+    pnpm-version:
+        description: "PNPM version (used only when `package.json` does not pin a `packageManager` field)"
+        default: "10.15.0"
+
+    playwright-version:
+        description: "Playwright version. Used as the discriminator in the browser-cache key, so it MUST match the `playwright-version` passed to `e2e-test-runner` in the downstream shards — otherwise the shards cache-miss and re-install browsers."
+        default: "1.53.2"
+
+    npm-token:
+        description: "NPM token for installing private dependencies. Leave empty to skip .npmrc auth (e.g. when the project pulls only public packages)."
+        required: false
+        default: ""
+
+runs:
+    using: composite
+    steps:
+        # -----------------------------------------------------
+        # WARM PNPM STORE CACHE
+        # -----------------------------------------------------
+        # `pnpm-cache: "write"` produces the same key the downstream
+        # `e2e-test-runner` setup step expects; that step uses
+        # `actions/cache@v4` (write mode) too, so when all 4 shards run
+        # in parallel they restore from this populated entry instead of
+        # each performing a full network install.
+        - name: Setup & install (warm pnpm store cache)
+          uses: technance-foundation/github-actions/setup@main
+          with:
+              node-version: ${{ inputs.node-version }}
+              pnpm-version: ${{ inputs.pnpm-version }}
+              npm-token: ${{ inputs.npm-token }}
+              pnpm-cache: "write"
+              install: "pnpm install --no-frozen-lockfile"
+              build: "false"
+
+        # -----------------------------------------------------
+        # WARM PLAYWRIGHT BROWSER CACHE
+        # -----------------------------------------------------
+        # Cache key MUST stay byte-identical to the one in
+        # `e2e-test-runner/action.yml` so the shards hit the entry
+        # this job writes. If you change one, change both.
+        - name: Cache Playwright browsers (write)
+          id: cache-playwright
+          uses: actions/cache@v5
+          with:
+              path: ~/.cache/ms-playwright
+              key: ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+              restore-keys: |
+                  ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-
+
+        - name: Install Playwright browsers (cache miss)
+          if: steps.cache-playwright.outputs.cache-hit != 'true'
+          shell: bash
+          run: pnpm exec playwright install --with-deps chromium

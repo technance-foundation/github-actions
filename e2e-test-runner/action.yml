@@ -31,8 +31,9 @@ inputs:
         default: "1.53.2"
 
     npm-token:
-        description: "NPM token for installing private dependencies"
-        required: true
+        description: "NPM token for installing private dependencies. Leave empty to skip .npmrc auth (e.g. when the project pulls only public packages)."
+        required: false
+        default: ""
 
     test-command:
         description: "Command used to run E2E tests"
@@ -68,7 +69,7 @@ runs:
           uses: actions/checkout@v6
           with:
               repository: technance-foundation/github-actions
-              ref: v1
+              ref: main
               path: ./.github/actions/github-actions
               sparse-checkout: |
                   e2e-check
@@ -84,7 +85,7 @@ runs:
         # calls are safe.
         - name: Mark check as in_progress
           id: mark-in-progress
-          uses: technance-foundation/github-actions/e2e-check@v1
+          uses: technance-foundation/github-actions/e2e-check@main
           with:
               token: ${{ inputs.token }}
               check-run-id: ${{ inputs.check-run-id }}
@@ -95,7 +96,7 @@ runs:
         # -----------------------------------------------------
         - name: Setup & install (root)
           id: setup
-          uses: technance-foundation/github-actions/setup@v1
+          uses: technance-foundation/github-actions/setup@main
           with:
               node-version: ${{ inputs.node-version }}
               pnpm-version: ${{ inputs.pnpm-version }}
@@ -171,7 +172,7 @@ runs:
         # -----------------------------------------------------
         - name: Complete check
           if: always() && inputs.skip-check-completion != 'true'
-          uses: technance-foundation/github-actions/e2e-check@v1
+          uses: technance-foundation/github-actions/e2e-check@main
           with:
               token: ${{ inputs.token }}
               check-run-id: ${{ inputs.check-run-id }}

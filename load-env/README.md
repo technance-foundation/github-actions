@@ -30,7 +30,7 @@ jobs:
             - uses: actions/checkout@v6
 
             - name: Load environment variables
-              uses: technance-foundation/github-actions/load-env@v1
+              uses: technance-foundation/github-actions/load-env@main
               with:
                   file: .env.ci
 

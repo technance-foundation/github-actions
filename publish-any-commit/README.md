@@ -26,7 +26,7 @@ jobs:
     build:
         runs-on: ubuntu-latest
         steps:
-            - uses: technance-foundation/github-actions/publish-any-commit@v1
+            - uses: technance-foundation/github-actions/publish-any-commit@main
 ```
 
 ## With NPM Authentication
@@ -34,7 +34,7 @@ jobs:
 If you need to authenticate with a private NPM registry:
 
 ```yaml
-- uses: technance-foundation/github-actions/publish-any-commit@v1
+- uses: technance-foundation/github-actions/publish-any-commit@main
   with:
       npm-token: ${{ secrets.NPM_TOKEN }}
 ```
@@ -42,7 +42,7 @@ If you need to authenticate with a private NPM registry:
 ## Target a Single Package
 
 ```yaml
-- uses: technance-foundation/github-actions/publish-any-commit@v1
+- uses: technance-foundation/github-actions/publish-any-commit@main
   with:
       package-paths: "./packages/worphling"
 ```
@@ -50,7 +50,7 @@ If you need to authenticate with a private NPM registry:
 ## Target Multiple Packages
 
 ```yaml
-- uses: technance-foundation/github-actions/publish-any-commit@v1
+- uses: technance-foundation/github-actions/publish-any-commit@main
   with:
       package-paths: |
           ./packages/nova

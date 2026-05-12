@@ -30,7 +30,7 @@ If you’re curious how that works, see: [RELAY.md](../RELAY.md)
 | `check-run-id`       | ✔️       | The GitHub Check Run ID                                           |
 | `project`            | ✔️       | Project/app name used for reporting and default working directory |
 | `preview-url`        | ✔️       | BASE_URL for testing                                              |
-| `npm-token`          | ✔️       | NPM token for installing private dependencies                     |
+| `npm-token`          | –        | NPM token for installing private dependencies. Optional; leave empty to skip `.npmrc` auth when only public packages are needed |
 | `node-version`       | –        | Node version (`22`)                                               |
 | `pnpm-version`       | –        | pnpm version (`10.15.0`)                                          |
 | `playwright-version` | –        | Playwright version (`1.53.2`)                                     |
@@ -64,7 +64,7 @@ Uses:
 - `apps/<project>` as working directory
 
 ```yaml
-- uses: technance-foundation/github-actions/e2e-test-runner@v1
+- uses: technance-foundation/github-actions/e2e-test-runner@main
   with:
       token: ${{ steps.app-token.outputs.token }}
       check-run-id: ${{ inputs.check_run_id }}
@@ -78,7 +78,7 @@ Uses:
 ### Custom test command
 
 ```yaml
-- uses: technance-foundation/github-actions/e2e-test-runner@v1
+- uses: technance-foundation/github-actions/e2e-test-runner@main
   with:
       token: ${{ steps.app-token.outputs.token }}
       check-run-id: ${{ inputs.check_run_id }}
@@ -93,7 +93,7 @@ Uses:
 ### Custom working directory
 
 ```yaml
-- uses: technance-foundation/github-actions/e2e-test-runner@v1
+- uses: technance-foundation/github-actions/e2e-test-runner@main
   with:
       token: ${{ steps.app-token.outputs.token }}
       check-run-id: ${{ inputs.check_run_id }}
@@ -108,7 +108,7 @@ Uses:
 ### Example: run a specific test file
 
 ```yaml
-- uses: technance-foundation/github-actions/e2e-test-runner@v1
+- uses: technance-foundation/github-actions/e2e-test-runner@main
   with:
       token: ${{ steps.app-token.outputs.token }}
       check-run-id: ${{ inputs.check_run_id }}
@@ -123,7 +123,7 @@ Uses:
 ### Example: custom working directory and custom test command
 
 ```yaml
-- uses: technance-foundation/github-actions/e2e-test-runner@v1
+- uses: technance-foundation/github-actions/e2e-test-runner@main
   with:
       token: ${{ steps.app-token.outputs.token }}
       check-run-id: ${{ inputs.check_run_id }}
@@ -175,7 +175,7 @@ jobs:
                   app_id: ${{ vars.E2E_RELAY_GH_APP_ID }}
                   private_key: ${{ secrets.E2E_RELAY_GH_APP_PRIVATE_KEY }}
 
-            - uses: technance-foundation/github-actions/e2e-test-runner@v1
+            - uses: technance-foundation/github-actions/e2e-test-runner@main
               env:
                   PLAYWRIGHT_WORKERS: "2"
                   # Read by your shard-aware Playwright config so each
@@ -207,7 +207,7 @@ jobs:
                   app_id: ${{ vars.E2E_RELAY_GH_APP_ID }}
                   private_key: ${{ secrets.E2E_RELAY_GH_APP_PRIVATE_KEY }}
 
-            - uses: technance-foundation/github-actions/setup@v1
+            - uses: technance-foundation/github-actions/setup@main
               with:
                   node-version: "24"
                   pnpm-version: "10.32.1"
@@ -247,7 +247,7 @@ jobs:
                   retention-days: 30
                   if-no-files-found: error
 
-            - uses: technance-foundation/github-actions/e2e-check@v1
+            - uses: technance-foundation/github-actions/e2e-check@main
               if: ${{ always() }}
               with:
                   token: ${{ steps.app-token.outputs.token }}
