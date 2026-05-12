@@ -32,8 +32,34 @@ runs:
           with:
               node-version: ${{ inputs.node-version }}
 
-        - name: Setup pnpm
-          id: pnpm-setup
+        # `pnpm/action-setup@v4` errors when both its `version` input and the
+        # `packageManager` field in `package.json` are set and disagree. Defer
+        # to `packageManager` whenever it pins a pnpm version so the install
+        # always matches the checked-out lockfile; fall back to the input only
+        # for repos that don't pin `packageManager`.
+        - name: Resolve pnpm version source
+          id: pnpm-source
+          shell: bash
+          run: |
+              package_json_path="${{ inputs.working-directory }}/package.json"
+              package_json_path="${package_json_path#./}"
+              package_json_path="${package_json_path#/}"
+              echo "package_json_file=${package_json_path}" >> "$GITHUB_OUTPUT"
+              if [ -f "${package_json_path}" ] && grep -Eq '^[[:space:]]*"packageManager"[[:space:]]*:[[:space:]]*"pnpm@' "${package_json_path}"; then
+                  echo "from_package_json=true" >> "$GITHUB_OUTPUT"
+              else
+                  echo "from_package_json=false" >> "$GITHUB_OUTPUT"
+              fi
+
+        - name: Setup pnpm (from `packageManager` field)
+          if: ${{ steps.pnpm-source.outputs.from_package_json == 'true' }}
+          uses: pnpm/action-setup@v4
+          with:
+              run_install: false
+              package_json_file: ${{ steps.pnpm-source.outputs.package_json_file }}
+
+        - name: Setup pnpm (from `pnpm-version` input)
+          if: ${{ steps.pnpm-source.outputs.from_package_json == 'false' }}
           uses: pnpm/action-setup@v4
           with:
               version: ${{ inputs.pnpm-version }}
