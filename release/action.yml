@@ -414,7 +414,7 @@ runs:
                 fi
 
                 pkg_json="$(
-                  find . -path ./node_modules -prune -o -name package.json -print 2>/dev/null \
+                  find . \( -type d -name node_modules -prune \) -o -name package.json -print 2>/dev/null \
                     | xargs -I {} sh -c 'if [ "$(jq -r ".name // empty" "{}" 2>/dev/null)" = "'"$name"'" ]; then echo "{}"; fi' \
                     | head -n 1
                 )"
