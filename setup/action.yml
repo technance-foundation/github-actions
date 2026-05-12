@@ -45,7 +45,11 @@ runs:
               package_json_path="${package_json_path#./}"
               package_json_path="${package_json_path#/}"
               echo "package_json_file=${package_json_path}" >> "$GITHUB_OUTPUT"
-              if [ -f "${package_json_path}" ] && grep -Eq '^[[:space:]]*"packageManager"[[:space:]]*:[[:space:]]*"pnpm@' "${package_json_path}"; then
+              if [ -f "${package_json_path}" ] && node -e '
+                  const fs = require("fs");
+                  const pm = (JSON.parse(fs.readFileSync(process.argv[1], "utf8")).packageManager) || "";
+                  process.exit(/^pnpm@/.test(pm) ? 0 : 1);
+              ' "${package_json_path}"; then
                   echo "from_package_json=true" >> "$GITHUB_OUTPUT"
               else
                   echo "from_package_json=false" >> "$GITHUB_OUTPUT"
