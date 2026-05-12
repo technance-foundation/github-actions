@@ -12,8 +12,9 @@ inputs:
         description: "Cache strategy can be one of `read`, `write`, or `off`"
         default: "write"
     npm-token:
-        description: "NPM token for authenticating to the NPM registry"
-        required: true
+        description: "NPM token for authenticating to the NPM registry. Leave empty to skip .npmrc auth entirely (e.g. when no private packages are needed)."
+        required: false
+        default: ""
     install:
         description: "Either false to skip or the build command to run, default is `pnpm install --no-frozen-lockfile`"
         default: "pnpm install --no-frozen-lockfile"
@@ -99,6 +100,7 @@ runs:
                   ${{ runner.os }}-node-${{ inputs.node-version }}-pnpm-store-
 
         - name: Authenticate NPM registry
+          if: ${{ inputs.npm-token != '' }}
           shell: bash
           run: echo "//registry.npmjs.org/:_authToken=${{ inputs.npm-token }}" > ~/.npmrc
 

@@ -15,8 +15,9 @@ inputs:
         default: "1.53.2"
 
     npm-token:
-        description: "NPM token for installing private dependencies"
-        required: true
+        description: "NPM token for installing private dependencies. Leave empty to skip .npmrc auth (e.g. when the project pulls only public packages)."
+        required: false
+        default: ""
 
 runs:
     using: composite
@@ -30,7 +31,7 @@ runs:
         # in parallel they restore from this populated entry instead of
         # each performing a full network install.
         - name: Setup & install (warm pnpm store cache)
-          uses: technance-foundation/github-actions/setup@v1
+          uses: technance-foundation/github-actions/setup@main
           with:
               node-version: ${{ inputs.node-version }}
               pnpm-version: ${{ inputs.pnpm-version }}
