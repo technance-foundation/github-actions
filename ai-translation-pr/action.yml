@@ -211,7 +211,7 @@ runs:
 
         - name: Upload Worphling reports
           if: ${{ always() && steps.detect.outputs.affected_count != '0' }}
-          uses: actions/upload-artifact@v4
+          uses: actions/upload-artifact@v7
           with:
               name: worphling-ai-translation-pr-${{ inputs.pr-number }}-reports
               path: ${{ inputs.artifact-root }}/
