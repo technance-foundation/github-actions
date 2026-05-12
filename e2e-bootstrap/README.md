@@ -15,7 +15,7 @@ With this action in a job the shards `needs:`, the install + browser download ha
 
 | Name                 | Required | Default    | Description                                                                                                                                            |
 | -------------------- | -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm-token`          | ✔️       | —          | NPM token for installing private dependencies                                                                                                          |
+| `npm-token`          | –        | `""`       | NPM token for installing private dependencies. Optional; leave empty to skip `.npmrc` auth when only public packages are needed                        |
 | `node-version`       | –        | `22`       | Node.js version                                                                                                                                        |
 | `pnpm-version`       | –        | `10.15.0`  | pnpm version. Used only if `package.json` does not pin `packageManager`                                                                                |
 | `playwright-version` | –        | `1.53.2`   | Discriminator in the browser-cache key. **Must match** the `playwright-version` passed to `e2e-test-runner` in the shards, or the shards cache-miss    |
@@ -40,7 +40,7 @@ jobs:
               with:
                   fetch-depth: 1
 
-            - uses: technance-foundation/github-actions/e2e-bootstrap@v1
+            - uses: technance-foundation/github-actions/e2e-bootstrap@main
               with:
                   node-version: "24"
                   pnpm-version: "11.0.9"
@@ -55,7 +55,7 @@ jobs:
                 shard: [1, 2, 3, 4]
         steps:
             - uses: actions/checkout@v6
-            - uses: technance-foundation/github-actions/e2e-test-runner@v1
+            - uses: technance-foundation/github-actions/e2e-test-runner@main
               with:
                   # ... shard inputs as usual. pnpm + browser caches
                   # are already populated, so the runner's own setup

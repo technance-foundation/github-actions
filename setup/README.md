@@ -19,7 +19,7 @@ It handles environment setup, dependency installation, caching, and optional bui
 | `node-version`      | The version of Node.js to use. Default is `20`.                                                                                  |
 | `pnpm-version`      | The version of pnpm to use. Default is `9.0.6`.                                                                                  |
 | `pnpm-cache`        | Cache strategy can be one of `read`, `write`, or `off`. Default is `write`                                                       |
-| `npm-token`         | NPM token for authenticating to the NPM registry. Required if installing from private packages.                                  |
+| `npm-token`         | NPM token for authenticating to the NPM registry. Optional; leave empty when no private packages are needed and the `.npmrc` auth step is skipped entirely. |
 | `install`           | Either `"false"` to skip installing dependencies, or the install command to run. Default is `pnpm install --no-frozen-lockfile`. |
 | `build`             | Either `"false"` to skip building, or the build command to run. Default is `pnpm build`.                                         |
 | `working-directory` | The working directory to run the commands in. Default is `.`.                                                                    |
@@ -39,7 +39,7 @@ jobs:
     setup:
         runs-on: ubuntu-latest
         steps:
-            - uses: technance-foundation/github-actions/setup@v1
+            - uses: technance-foundation/github-actions/setup@main
               with:
                   node-version: "20"
                   pnpm-version: "10.6.5"
@@ -51,7 +51,7 @@ jobs:
 If you want to skip install or build:
 
 ```yaml
-- uses: technance-foundation/github-actions/setup@v1
+- uses: technance-foundation/github-actions/setup@main
   with:
   npm-token: ${{ secrets.NPM_TOKEN }}
   install: "false"
@@ -63,7 +63,7 @@ If you want to skip install or build:
 You can override the defaults:
 
 ```yaml
-- uses: technance-foundation/github-actions/setup@v1
+- uses: technance-foundation/github-actions/setup@main
   with:
   npm-token: ${{ secrets.NPM_TOKEN }}
   install: "pnpm install --frozen-lockfile"
@@ -75,7 +75,7 @@ You can override the defaults:
 If your project is in a subdirectory:
 
 ```yaml
-- uses: technance-foundation/github-actions/setup@v1
+- uses: technance-foundation/github-actions/setup@main
   with:
       npm-token: ${{ secrets.NPM_TOKEN }}
       working-directory: "./sdks/node"

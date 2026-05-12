@@ -208,7 +208,7 @@ jobs:
 
         steps:
             - name: Run automated release
-              uses: technance-foundation/github-actions/release@v2
+              uses: technance-foundation/github-actions/release@main
               with:
                   node-version: "22"
                   pnpm-version: "10.15.0"
