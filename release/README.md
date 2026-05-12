@@ -8,7 +8,8 @@ This composite GitHub Action implements a **fully automated release flow** using
 - Commits and pushes version bumps back to `main`
 - Publishes packages to npm
 - Creates **git tags** for released packages
-- Automatically **excludes `private: true` packages** from commit messages and tags
+- Creates a **GitHub Release** per released package, with the matching `CHANGELOG.md` section as the body (prerelease semver bumps are flagged accordingly)
+- Automatically **excludes `private: true` packages** from commit messages, tags, and GitHub Releases
 - Does **not** open PRs or rely on `changesets/action@v1`
 
 > ⚠️ Important: Your workflow **must skip this action when the commit author is `github-actions[bot]`** to avoid infinite loops.
@@ -127,8 +128,22 @@ Packages with `"private": true` in their `package.json` are automatically exclud
 
 - The generated commit message
 - Git tags
+- GitHub Releases
 
-This prevents internal-only workspaces (for example tooling packages) from being tagged as releases.
+This prevents internal-only workspaces (for example tooling packages) from being tagged or released.
+
+---
+
+## 📝 GitHub Releases
+
+For each tag the action pushes, it also creates a corresponding **GitHub Release**:
+
+- **Title** — the tag itself (`@scope/pkg@version`).
+- **Body** — the matching `## <version>` section of that package's `CHANGELOG.md`, which Changesets has just regenerated. If no section is found, the body falls back to a one-line "Released `@scope/pkg@version` to the npm registry."
+- **Prerelease** — flagged automatically when the new version contains a SemVer prerelease suffix (`1.2.3-alpha.0`, `1.2.3-rc.1`, …), so it doesn't replace the repo's "Latest release".
+- **Idempotent** — if a release with the same tag already exists (e.g. created by hand previously), the step skips it instead of failing.
+
+The release is created via `gh release create --verify-tag`, using the same token that pushed the tag (`push-token` if provided, otherwise `github.token`).
 
 ---
 
@@ -239,7 +254,8 @@ jobs:
 
 10. Publish packages (`publish-command`)
 11. Create and push git tags (from the filtered release list)
-12. Set outputs and clean up artifacts
+12. Create GitHub Releases for each tag, sourcing the body from the matching `CHANGELOG.md` section
+13. Set outputs and clean up artifacts
 
 ---
 

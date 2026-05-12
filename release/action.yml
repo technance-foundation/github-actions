@@ -130,6 +130,11 @@ runs:
                 echo "If you're using a self-hosted runner, install jq (and ensure bash is available)."
                 exit 1
               fi
+              if ! command -v gh >/dev/null 2>&1; then
+                echo "gh (GitHub CLI) is required but was not found on PATH."
+                echo "If you're using a self-hosted runner, install gh from https://cli.github.com/."
+                exit 1
+              fi
 
         - name: Authenticate NPM registry (optional)
           if: ${{ inputs.npm-token != '' }}
@@ -383,6 +388,74 @@ runs:
               done <<< "$TAGS"
 
               git push origin --tags
+
+        - name: Create GitHub Releases for released packages
+          if: ${{ steps.changeset-status.outputs.has_changesets == 'true' && steps.git-diff.outputs.has_changes == 'true' }}
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          env:
+              GH_TOKEN: ${{ inputs.push-token != '' && inputs.push-token || github.token }}
+          run: |
+              set -euo pipefail
+
+              if [ ! -f release.filtered.json ]; then
+                echo "release.filtered.json not found; cannot create GitHub Releases." >&2
+                exit 1
+              fi
+
+              while IFS= read -r row; do
+                name="$(echo "$row" | jq -r '.name')"
+                version="$(echo "$row" | jq -r '.newVersion')"
+                tag="${name}@${version}"
+
+                if gh release view "$tag" --json tagName >/dev/null 2>&1; then
+                  echo "GitHub Release for $tag already exists — skipping."
+                  continue
+                fi
+
+                pkg_json="$(
+                  find . \( -type d -name node_modules -prune \) -o -name package.json -print 2>/dev/null \
+                    | xargs -I {} sh -c 'if [ "$(jq -r ".name // empty" "{}" 2>/dev/null)" = "'"$name"'" ]; then echo "{}"; fi' \
+                    | head -n 1
+                )"
+
+                changelog_path=""
+                if [ -n "$pkg_json" ]; then
+                  changelog_path="$(dirname "$pkg_json")/CHANGELOG.md"
+                fi
+
+                notes_file="$(mktemp)"
+                if [ -n "$changelog_path" ] && [ -f "$changelog_path" ]; then
+                  awk -v ver="$version" '
+                    /^## / {
+                      if (in_section) exit
+                      if ($0 == "## " ver) { in_section = 1; next }
+                    }
+                    in_section { print }
+                  ' "$changelog_path" > "$notes_file"
+                fi
+
+                if [ ! -s "$notes_file" ]; then
+                  echo "::warning::No CHANGELOG section for $tag; using a generic release body."
+                  printf 'Released `%s` to the npm registry.\n' "$tag" > "$notes_file"
+                fi
+
+                prerelease_flag=()
+                # Any SemVer build metadata or prerelease suffix (e.g. `1.2.3-alpha.0`)
+                # gets marked as a prerelease so it doesn't replace "Latest release".
+                if [[ "$version" == *-* ]]; then
+                  prerelease_flag=(--prerelease)
+                fi
+
+                echo "Creating GitHub Release for $tag (prerelease=${prerelease_flag:+yes})"
+                gh release create "$tag" \
+                  --title "$tag" \
+                  --notes-file "$notes_file" \
+                  --verify-tag \
+                  "${prerelease_flag[@]}"
+
+                rm -f "$notes_file"
+              done < <(jq -c '.releases[]' release.filtered.json)
 
         - name: Set outputs
           id: set-output
