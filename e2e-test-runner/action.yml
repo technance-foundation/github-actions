@@ -119,7 +119,7 @@ runs:
         # BROWSER CACHING
         # -----------------------------------------------------
         # Two conditional cache steps: `actions/cache@v5` (read +
-        # write — default) vs `actions/cache/restore@v4` (read
+        # write — default) vs `actions/cache/restore@v5` (read
         # only). The downstream `cache-playwright` step normalizes
         # the `cache-hit` output so the install-on-miss step and
         # the final `Complete check` job-status expression don't
@@ -137,7 +137,7 @@ runs:
         - name: Cache Playwright browsers (restore only)
           id: cache-playwright-ro
           if: inputs.playwright-cache == 'read'
-          uses: actions/cache/restore@v4
+          uses: actions/cache/restore@v5
           with:
               path: ~/.cache/ms-playwright
               key: ${{ runner.os }}-playwright-${{ inputs.playwright-version }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -190,7 +190,7 @@ runs:
         - name: Upload Playwright blob report (sharded)
           id: upload-blob-report
           if: always() && inputs.shard-index != '' && inputs.shard-total != ''
-          uses: actions/upload-artifact@v4
+          uses: actions/upload-artifact@v7
           with:
               name: ${{ inputs.project }}-playwright-blob-report-${{ inputs.shard-index }}
               path: ${{ inputs.working-directory != '' && format('{0}/blob-report/', inputs.working-directory) || format('apps/{0}/blob-report/', inputs.project) }}
@@ -200,7 +200,7 @@ runs:
         - name: Upload Playwright report (un-sharded)
           id: upload-report
           if: always() && (inputs.shard-index == '' || inputs.shard-total == '')
-          uses: actions/upload-artifact@v4
+          uses: actions/upload-artifact@v7
           with:
               name: ${{ inputs.project }}-playwright-report
               path: ${{ inputs.working-directory != '' && format('{0}/playwright-report/', inputs.working-directory) || format('apps/{0}/playwright-report/', inputs.project) }}

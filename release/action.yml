@@ -107,7 +107,7 @@ runs:
               git config --global user.name "${{ inputs.git-user-name }}"
 
         - name: Setup pnpm
-          uses: pnpm/action-setup@v4
+          uses: pnpm/action-setup@v6
           with:
               version: ${{ inputs.pnpm-version }}
               run_install: false

@@ -189,10 +189,10 @@ jobs:
         steps:
             - uses: actions/checkout@v6
             - id: app-token
-              uses: tibdex/github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
-                  app_id: ${{ vars.E2E_RELAY_GH_APP_ID }}
-                  private_key: ${{ secrets.E2E_RELAY_GH_APP_PRIVATE_KEY }}
+                  app-id: ${{ vars.E2E_RELAY_GH_APP_ID }}
+                  private-key: ${{ secrets.E2E_RELAY_GH_APP_PRIVATE_KEY }}
 
             - uses: technance-foundation/github-actions/e2e-test-runner@main
               env:
@@ -224,10 +224,10 @@ jobs:
         steps:
             - uses: actions/checkout@v6
             - id: app-token
-              uses: tibdex/github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
-                  app_id: ${{ vars.E2E_RELAY_GH_APP_ID }}
-                  private_key: ${{ secrets.E2E_RELAY_GH_APP_PRIVATE_KEY }}
+                  app-id: ${{ vars.E2E_RELAY_GH_APP_ID }}
+                  private-key: ${{ secrets.E2E_RELAY_GH_APP_PRIVATE_KEY }}
 
             - uses: technance-foundation/github-actions/setup@main
               with:
@@ -241,7 +241,7 @@ jobs:
             - run: mkdir -p all-blob-reports
               shell: bash
 
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v8
               with:
                   pattern: ${{ inputs.project }}-playwright-blob-report-*
                   path: all-blob-reports
@@ -261,7 +261,7 @@ jobs:
                       --reporter=list,html,junit \
                       "${{ github.workspace }}/all-blob-reports"
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               if: ${{ always() }}
               with:
                   name: ${{ inputs.project }}-playwright-report
