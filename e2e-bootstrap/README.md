@@ -57,13 +57,15 @@ jobs:
             - uses: actions/checkout@v6
             - uses: technance-foundation/github-actions/e2e-test-runner@main
               with:
-                  # ... shard inputs as usual. pnpm + browser caches
-                  # are already populated, so the runner's own setup
-                  # steps will restore them instead of installing.
-                  ...
+                  # ... shard inputs as usual ...
+                  # Both caches are already populated by `bootstrap`;
+                  # mark them read-only so each shard skips ~60s of
+                  # post-job tar/save work on caches that already exist.
+                  pnpm-cache: "read"
+                  playwright-cache: "read"
 ```
 
-Pair with `strategy.fail-fast: true` at the matrix level so a failing shard cancels its siblings — bootstrap on its own only addresses duplicated *setup* time, not duplicated *test* time after a failure.
+Pair with `strategy.fail-fast: true` at the matrix level so a failing shard cancels its siblings — bootstrap on its own only addresses duplicated *setup* time, not duplicated *test* time after a failure. And pair with `pnpm-cache: "read"` + `playwright-cache: "read"` on the shards (shown above) so the cache-write half of the per-shard cycle is skipped too — without that, every shard still spends ~60s tar-ing a cache it never gets to upload.
 
 ## Why not put this in `e2e-test-runner`?
 

@@ -39,6 +39,8 @@ If you’re curious how that works, see: [RELAY.md](../RELAY.md)
 | `shard-index`          | –        | 1-based shard index. When set together with `shard-total`, the action runs Playwright in shard mode (see below). |
 | `shard-total`          | –        | Total number of shards. Required alongside `shard-index` to enable shard mode. |
 | `skip-check-completion` | –        | When `'true'`, the action does not mark the GitHub check as completed at the end of the job. Use this when a downstream merge job owns the final check status. |
+| `pnpm-cache`           | –        | pnpm-store cache strategy. `write` (default) restores + saves; `read` restores only; `off` disables the cache. Set to `read` on shards that follow an `e2e-bootstrap` job (see below). |
+| `playwright-cache`     | –        | Playwright browser cache strategy. `write` (default) restores + saves; `read` restores only. Set to `read` on shards that follow an `e2e-bootstrap` job. |
 
 ---
 
@@ -155,16 +157,33 @@ When `shard-index` AND `shard-total` are both set:
 - `--shard=<index>/<total>` is appended to `test-command` (after `--`, so wrapper scripts that respect `--` get the flag).
 - The Playwright config is expected to use the [`blob` reporter](https://playwright.dev/docs/test-reporters#blob-reporter) writing to `blob-report/`.
 - Instead of uploading `playwright-report/`, the action uploads `blob-report/` as `<project>-playwright-blob-report-<shard-index>` so a merge job can pick the artifacts up by glob.
-- If `skip-check-completion: "true"` is also set, the action skips `e2e-check@v1 state: completed` so the merge job can finalize the check exactly once (4 shards otherwise race PATCH `/check-runs` with conflicting outcomes).
+- If `skip-check-completion: "true"` is also set, the action skips `e2e-check@main state: completed` so the merge job can finalize the check exactly once (4 shards otherwise race PATCH `/check-runs` with conflicting outcomes).
+
+### Pairing with `e2e-bootstrap` (read-only caches on shards)
+
+When the matrix is preceded by an [`e2e-bootstrap`](../e2e-bootstrap/README.md) job that primes the pnpm store + Playwright browser caches, every shard then sees both caches as already-existing. The shards should pass `pnpm-cache: "read"` and `playwright-cache: "read"` so they only **restore** the caches — they don't waste ~30–60s of post-job time tar-ing and trying to save the same content. The save itself is a no-op (GHA dedupes by key), but the tar/upload-prep work still runs on every shard unless you opt out.
 
 ### Caller workflow example
 
 ```yaml
 jobs:
+    bootstrap:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 1
+
+            - uses: technance-foundation/github-actions/e2e-bootstrap@main
+              with:
+                  node-version: "24"
+                  pnpm-version: "11.0.9"
+
     test-e2e-sharded:
+        needs: bootstrap
         runs-on: 8core-linux-x64-ubuntu-latest
         strategy:
-            fail-fast: false
+            fail-fast: true
             matrix:
                 shard: [1, 2, 3, 4]
         steps:
@@ -188,12 +207,15 @@ jobs:
                   check-run-id: ${{ inputs.check_run_id }}
                   project: ${{ inputs.project }}
                   preview-url: ${{ inputs.url }}
-                  npm-token: ${{ secrets.NPM_TOKEN }}
                   working-directory: ${{ inputs.working_directory }}
                   test-command: ${{ inputs.test_command }}
                   shard-index: ${{ matrix.shard }}
                   shard-total: ${{ strategy.job-total }}
                   skip-check-completion: "true"
+                  # Caches were written once by `bootstrap`; shards
+                  # just restore them — saves ~60s post-job per shard.
+                  pnpm-cache: "read"
+                  playwright-cache: "read"
 
     e2e-merge:
         runs-on: ubuntu-latest
