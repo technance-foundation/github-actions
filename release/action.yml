@@ -399,8 +399,8 @@ runs:
               set -euo pipefail
 
               if [ ! -f release.filtered.json ]; then
-                echo "release.filtered.json not found; cannot create GitHub Releases."
-                exit 0
+                echo "release.filtered.json not found; cannot create GitHub Releases." >&2
+                exit 1
               fi
 
               while IFS= read -r row; do
